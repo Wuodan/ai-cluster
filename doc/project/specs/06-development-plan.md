@@ -213,6 +213,26 @@ past outcomes.
 - Re-evaluation can supersede stale evidence without deleting history.
 - The system can conclude that no currently available resource is suitable.
 
+### Current status
+
+The milestone is complete. Capability evidence is append-only and records the selectable resource, provider-resolved
+model when available, access path, controlled input, output, evaluator, verdict, rationale, uncertainty when applicable,
+and observation time. Advertised and observed evidence are distinct; only the latest observed evidence qualifies a
+resource for a requirement. Re-evaluation supersedes the current decision without deleting earlier evidence.
+
+The initial deterministic suite covers basic text generation, exact instruction following, and structured JSON. Requests
+can require named capabilities or a minimum observed context size. Resources that lack supporting evidence or whose latest
+test failed are skipped. If none qualify, the loop returns `no_suitable_source` without spending a request.
+
+In a live containerized evaluation, both OpenRouter and Groq passed text generation and exact instruction following.
+Groq passed structured JSON, while the rotating OpenRouter free route failed that test. A subsequent structured-JSON task
+therefore selected Groq. A tool-use task produced `no_suitable_source` and made no provider call. The OpenRouter tests
+resolved to different underlying models, so route-level evidence must be treated as time-sensitive access-path evidence;
+the actual resolved model is retained with every evaluation.
+
+No LLM evaluator is used yet. Coding quality and other non-deterministic capabilities remain unknown rather than being
+assigned unsupported confidence. A later evaluator may judge them only if its rationale and uncertainty are retained.
+
 ## Milestone 5: local fallback and resource recovery
 
 ### Hypothesis

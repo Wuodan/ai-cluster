@@ -3,6 +3,7 @@ import type { QuotaEvidence, SourceResult } from "../resource.js";
 export type Fetch = typeof globalThis.fetch;
 
 interface ChatCompletionResponse {
+  readonly model?: unknown;
   readonly choices?: readonly {
     readonly message?: { readonly content?: unknown };
   }[];
@@ -58,11 +59,14 @@ export async function invokeOpenAiCompatible(options: {
     };
   }
 
+  const resolvedModel = typeof body.json.model === "string" ? body.json.model : undefined;
+
   if (options.requireReportedZeroCost && body.json.usage?.cost !== 0) {
     return {
       outcome: "rejected",
       errorCode: "zero_cost_invariant",
       errorMessage: "Provider did not report an exact zero cost",
+      ...(resolvedModel === undefined ? {} : { resolvedModel }),
       ...(quota === undefined ? {} : { quota }),
     };
   }
@@ -72,6 +76,7 @@ export async function invokeOpenAiCompatible(options: {
     return {
       outcome: "malformed_response",
       errorMessage: "Provider response did not contain text output",
+      ...(resolvedModel === undefined ? {} : { resolvedModel }),
       ...(quota === undefined ? {} : { quota }),
     };
   }
@@ -79,6 +84,7 @@ export async function invokeOpenAiCompatible(options: {
   return {
     outcome: "success",
     output,
+    ...(resolvedModel === undefined ? {} : { resolvedModel }),
     ...(quota === undefined ? {} : { quota }),
   };
 }

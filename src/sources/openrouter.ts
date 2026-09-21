@@ -4,6 +4,7 @@ import { invokeOpenAiCompatible, type Fetch } from "./openai-compatible.js";
 export class OpenRouterSource implements InferenceSource {
   readonly id = "openrouter";
   readonly model = "openrouter/free";
+  readonly accessPath = "api" as const;
   readonly #apiKey: string;
   readonly #fetch: Fetch;
 

@@ -10,6 +10,7 @@ type ProcessRunner = typeof runProcess;
 export class CodexCliSource implements InferenceSource {
   readonly id = "codex-cli";
   readonly model = "account-default";
+  readonly accessPath = "process" as const;
   readonly #runner: ProcessRunner;
   readonly #timeoutMs: number;
 

@@ -4,6 +4,7 @@ import { invokeOpenAiCompatible, type Fetch } from "./openai-compatible.js";
 export class GroqSource implements InferenceSource {
   readonly id = "groq";
   readonly model = "openai/gpt-oss-120b";
+  readonly accessPath = "api" as const;
   readonly #apiKey: string;
   readonly #fetch: Fetch;
 

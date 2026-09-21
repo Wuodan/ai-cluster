@@ -3,8 +3,9 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+import type { CapabilityEvidence, EvidenceKind } from "./capability.js";
 import type { CatalogEntry, CatalogStatus } from "./catalog.js";
-import type { AttemptOutcome, QuotaEvidence } from "./resource.js";
+import type { AttemptOutcome, Capability, QuotaEvidence, ResourceRequirements } from "./resource.js";
 import type { ResourceState, ResourceStateRecord } from "./resource-state.js";
 
 export interface AttemptRecord {
@@ -41,6 +42,12 @@ export interface CatalogModelRecord extends CatalogEntry {
   readonly firstSeenAtMs: number;
   readonly lastSeenAtMs: number;
   readonly statusReason: string;
+}
+
+export interface StoredCapabilityEvidence extends CapabilityEvidence {
+  readonly id: string;
+  readonly sequence: number;
+  readonly resourceKey: string;
 }
 
 export class ResourceStore {
@@ -282,6 +289,87 @@ export class ResourceStore {
     );
   }
 
+  async recordCapabilityEvidence(evidence: CapabilityEvidence): Promise<string> {
+    const id = randomUUID();
+    const resourceKey = `${evidence.sourceId}:${evidence.model}`;
+    this.#database.exec("BEGIN IMMEDIATE");
+    try {
+      const latest = this.#database.prepare(`
+        SELECT MAX(sequence) AS sequence
+        FROM capability_evidence
+        WHERE resource_key = ? AND capability = ? AND evidence_kind = ?
+      `).get(resourceKey, evidence.capability, evidence.evidenceKind) as { sequence: number | null };
+      const sequence = (latest.sequence ?? 0) + 1;
+      this.#database.prepare(`
+        INSERT INTO capability_evidence (
+          id, resource_key, sequence, source_id, model, access_path, capability,
+          resolved_model, evidence_kind, verdict, numeric_value, evaluator, test_id,
+          input_text, output_text, rationale, uncertainty, observed_at_ms
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        id,
+        resourceKey,
+        sequence,
+        evidence.sourceId,
+        evidence.model,
+        evidence.accessPath,
+        evidence.capability,
+        evidence.resolvedModel ?? null,
+        evidence.evidenceKind,
+        evidence.verdict,
+        evidence.numericValue ?? null,
+        evidence.evaluator,
+        evidence.testId,
+        evidence.input,
+        evidence.output ?? null,
+        evidence.rationale,
+        evidence.uncertainty ?? null,
+        evidence.observedAtMs,
+      );
+      this.#database.exec("COMMIT");
+      return id;
+    } catch (error: unknown) {
+      this.#database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  async listCapabilityEvidence(
+    resourceKey: string,
+    capability?: Capability,
+  ): Promise<readonly StoredCapabilityEvidence[]> {
+    const rows = capability === undefined
+      ? this.#database.prepare(`
+          SELECT * FROM capability_evidence WHERE resource_key = ?
+          ORDER BY capability, evidence_kind, sequence
+        `).all(resourceKey)
+      : this.#database.prepare(`
+          SELECT * FROM capability_evidence WHERE resource_key = ? AND capability = ?
+          ORDER BY evidence_kind, sequence
+        `).all(resourceKey, capability);
+    return rows.map((row) => this.#toCapabilityEvidence(row as Record<string, unknown>));
+  }
+
+  async resourceMeetsRequirements(
+    resourceKey: string,
+    requirements: ResourceRequirements | undefined,
+  ): Promise<boolean> {
+    if (requirements === undefined) return true;
+    for (const capability of requirements.capabilities ?? []) {
+      const latest = this.#latestCapabilityEvidence(resourceKey, capability, "observed");
+      if (latest?.verdict !== "supported") return false;
+    }
+    if (requirements.minimumContextTokens !== undefined) {
+      const latest = this.#latestCapabilityEvidence(resourceKey, "context_tokens", "observed");
+      if (
+        latest?.verdict !== "supported"
+        || latest.numericValue === undefined
+        || latest.numericValue < requirements.minimumContextTokens
+      ) return false;
+    }
+    return true;
+  }
+
   #migrate(): void {
     this.#database.exec(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -370,9 +458,38 @@ export class ResourceStore {
         model_count INTEGER NOT NULL CHECK (model_count >= 0)
       ) STRICT;
 
+      CREATE TABLE IF NOT EXISTS capability_evidence (
+        id TEXT PRIMARY KEY,
+        resource_key TEXT NOT NULL,
+        sequence INTEGER NOT NULL CHECK (sequence > 0),
+        source_id TEXT NOT NULL,
+        model TEXT NOT NULL,
+        access_path TEXT NOT NULL CHECK (access_path IN ('api', 'process', 'local')),
+        capability TEXT NOT NULL CHECK (capability IN (
+          'text_generation', 'instruction_following', 'structured_json',
+          'tool_use', 'coding', 'context_tokens'
+        )),
+        resolved_model TEXT,
+        evidence_kind TEXT NOT NULL CHECK (evidence_kind IN ('advertised', 'observed')),
+        verdict TEXT NOT NULL CHECK (verdict IN ('supported', 'unsupported')),
+        numeric_value INTEGER,
+        evaluator TEXT NOT NULL CHECK (evaluator IN ('provider_claim', 'deterministic', 'llm')),
+        test_id TEXT NOT NULL,
+        input_text TEXT NOT NULL,
+        output_text TEXT,
+        rationale TEXT NOT NULL,
+        uncertainty REAL CHECK (uncertainty IS NULL OR (uncertainty >= 0 AND uncertainty <= 1)),
+        observed_at_ms INTEGER NOT NULL,
+        UNIQUE (resource_key, capability, evidence_kind, sequence)
+      ) STRICT;
+
+      CREATE INDEX IF NOT EXISTS capability_evidence_latest
+        ON capability_evidence (resource_key, capability, evidence_kind, sequence DESC);
+
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (1);
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (2);
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (3);
+      INSERT OR IGNORE INTO schema_migrations (version) VALUES (4);
     `);
   }
 
@@ -385,6 +502,7 @@ export class ResourceStore {
       attemptNumber: row.attempt_number as number,
       sourceId: row.source_id as string,
       model: row.model as string,
+      ...(row.resolved_model === null ? {} : { resolvedModel: row.resolved_model as string }),
       outcome: row.outcome as AttemptOutcome,
       startedAtMs: row.started_at_ms as number,
       finishedAtMs: row.finished_at_ms as number,
@@ -420,6 +538,41 @@ export class ResourceStore {
       INSERT INTO catalog_events (id, source_id, model_id, status, reason, observed_at_ms)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(randomUUID(), sourceId, modelId, status, reason, observedAtMs);
+  }
+
+  #latestCapabilityEvidence(
+    resourceKey: string,
+    capability: Capability,
+    evidenceKind: EvidenceKind,
+  ): StoredCapabilityEvidence | undefined {
+    const row = this.#database.prepare(`
+      SELECT * FROM capability_evidence
+      WHERE resource_key = ? AND capability = ? AND evidence_kind = ?
+      ORDER BY sequence DESC LIMIT 1
+    `).get(resourceKey, capability, evidenceKind) as Record<string, unknown> | undefined;
+    return row === undefined ? undefined : this.#toCapabilityEvidence(row);
+  }
+
+  #toCapabilityEvidence(row: Record<string, unknown>): StoredCapabilityEvidence {
+    return {
+      id: row.id as string,
+      sequence: row.sequence as number,
+      resourceKey: row.resource_key as string,
+      sourceId: row.source_id as string,
+      model: row.model as string,
+      accessPath: row.access_path as CapabilityEvidence["accessPath"],
+      capability: row.capability as Capability,
+      evidenceKind: row.evidence_kind as CapabilityEvidence["evidenceKind"],
+      verdict: row.verdict as CapabilityEvidence["verdict"],
+      ...(row.numeric_value === null ? {} : { numericValue: row.numeric_value as number }),
+      evaluator: row.evaluator as CapabilityEvidence["evaluator"],
+      testId: row.test_id as string,
+      input: row.input_text as string,
+      ...(row.output_text === null ? {} : { output: row.output_text as string }),
+      rationale: row.rationale as string,
+      ...(row.uncertainty === null ? {} : { uncertainty: row.uncertainty as number }),
+      observedAtMs: row.observed_at_ms as number,
+    };
   }
 }
 

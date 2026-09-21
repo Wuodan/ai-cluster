@@ -36,9 +36,12 @@ export class ResourceLoop {
   async run(request: InferenceRequest): Promise<InferenceRunResult> {
     const requestId = randomUUID();
     const outcomes: AttemptOutcome[] = [];
+    let suitableResourceCount = 0;
 
     for (const [index, source] of this.#sources.entries()) {
       const key = resourceKey(source);
+      if (!await this.#store.resourceMeetsRequirements(key, request.requirements)) continue;
+      suitableResourceCount += 1;
       let previousState = await this.#store.getResourceState(key);
       const selectionTimeMs = this.#now();
       if (previousState?.state === "disabled") continue;
@@ -104,6 +107,15 @@ export class ResourceLoop {
       }
     }
 
+    if (suitableResourceCount === 0) {
+      return {
+        status: "no_suitable_source",
+        requiredCapabilities: request.requirements?.capabilities ?? [],
+        ...(request.requirements?.minimumContextTokens === undefined
+          ? {}
+          : { minimumContextTokens: request.requirements.minimumContextTokens }),
+      };
+    }
     return { status: "no_source_succeeded", outcomes };
   }
 }

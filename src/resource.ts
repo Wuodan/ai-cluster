@@ -12,7 +12,24 @@ export type AttemptOutcome = (typeof attemptOutcomes)[number];
 export interface InferenceRequest {
   readonly prompt: string;
   readonly maxOutputTokens: number;
+  readonly requirements?: ResourceRequirements;
 }
+
+export interface ResourceRequirements {
+  readonly capabilities?: readonly Capability[];
+  readonly minimumContextTokens?: number;
+}
+
+export const capabilities = [
+  "text_generation",
+  "instruction_following",
+  "structured_json",
+  "tool_use",
+  "coding",
+  "context_tokens",
+] as const;
+
+export type Capability = (typeof capabilities)[number];
 
 export interface QuotaEvidence {
   readonly requestsLimit?: number;
@@ -26,6 +43,7 @@ export interface QuotaEvidence {
 export interface SourceResult {
   readonly outcome: AttemptOutcome;
   readonly output?: string;
+  readonly resolvedModel?: string;
   readonly errorCode?: string;
   readonly errorMessage?: string;
   readonly quota?: QuotaEvidence;
@@ -34,6 +52,7 @@ export interface SourceResult {
 export interface InferenceSource {
   readonly id: string;
   readonly model: string;
+  readonly accessPath: "api" | "process" | "local";
   invoke(request: InferenceRequest): Promise<SourceResult>;
 }
 
@@ -49,4 +68,10 @@ export interface NoSourceSucceeded {
   readonly outcomes: readonly AttemptOutcome[];
 }
 
-export type InferenceRunResult = SuccessfulInference | NoSourceSucceeded;
+export interface NoSuitableSource {
+  readonly status: "no_suitable_source";
+  readonly requiredCapabilities: readonly Capability[];
+  readonly minimumContextTokens?: number;
+}
+
+export type InferenceRunResult = SuccessfulInference | NoSourceSucceeded | NoSuitableSource;

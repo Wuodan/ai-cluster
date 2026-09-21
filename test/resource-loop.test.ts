@@ -9,6 +9,7 @@ import { ResourceLoop, resourceKey } from "../src/resource-loop.js";
 import { ResourceStore } from "../src/store.js";
 
 class FakeSource implements InferenceSource {
+  readonly accessPath = "api" as const;
   readonly #results: SourceResult[];
   calls = 0;
 
@@ -70,6 +71,7 @@ test("converts a thrown source error into durable evidence", async () => {
   const broken: InferenceSource = {
     id: "broken",
     model: "free-c",
+    accessPath: "api",
     async invoke() {
       throw new Error("network down");
     },
