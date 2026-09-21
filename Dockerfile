@@ -16,4 +16,4 @@ COPY package.json ./
 RUN mkdir /data && chown node:node /data
 
 USER node
-ENTRYPOINT ["node", "dist/src/cli.js"]
+CMD ["node", "dist/src/cli.js"]

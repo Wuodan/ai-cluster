@@ -1,25 +1,22 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { evaluateSource } from "./capability.js";
+import { createConfiguredSources, parseSourceNames } from "./configured-sources.js";
 import { zeroCostResourceKeys } from "./policy.js";
 import { runRecovery } from "./recovery.js";
-import { capabilities, type Capability, type InferenceSource, type ResourceRequirements } from "./resource.js";
+import { capabilities, type Capability, type ResourceRequirements } from "./resource.js";
 import { ResourceLoop } from "./resource-loop.js";
-import { CodexCliSource } from "./sources/codex-cli.js";
-import { GroqSource } from "./sources/groq.js";
-import { LocalLlamaSource } from "./sources/local-llama.js";
-import { OpenRouterSource } from "./sources/openrouter.js";
 import { ResourceStore } from "./store.js";
 
 const secretsDirectory = process.env.AI_CLUSTER_SECRETS_DIR ?? "/run/secrets";
 const databasePath = process.env.AI_CLUSTER_DATABASE_PATH ?? "/data/resource-loop.sqlite";
 const command = process.env.AI_CLUSTER_COMMAND ?? "infer";
-const sourceNames = (process.env.AI_CLUSTER_SOURCES ?? (command === "recover" ? "local" : "openrouter,groq"))
-  .split(",")
-  .map((name) => name.trim())
-  .filter((name) => name.length > 0);
-const sources = sourceNames.map(createSource);
+const sourceNames = parseSourceNames(process.env.AI_CLUSTER_SOURCES ?? (command === "recover" ? "local" : "openrouter,groq"));
+const sources = createConfiguredSources({
+  names: sourceNames,
+  secretsDirectory,
+  ...(process.env.AI_CLUSTER_LOCAL_ENDPOINT === undefined
+    ? {}
+    : { localEndpoint: process.env.AI_CLUSTER_LOCAL_ENDPOINT }),
+});
 const store = new ResourceStore(databasePath);
 
 try {
@@ -88,28 +85,6 @@ function readRequirements(): ResourceRequirements | undefined {
     ...(requiredCapabilities.length === 0 ? {} : { capabilities: requiredCapabilities }),
     ...(minimumContextTokens === undefined ? {} : { minimumContextTokens }),
   };
-}
-
-function createSource(name: string): InferenceSource {
-  if (name === "openrouter") {
-    return new OpenRouterSource(readSecret("openrouter_api_key"));
-  }
-  if (name === "groq") {
-    return new GroqSource(readSecret("groq_api_key"));
-  }
-  if (name === "codex") {
-    return new CodexCliSource();
-  }
-  if (name === "local") {
-    return new LocalLlamaSource(process.env.AI_CLUSTER_LOCAL_ENDPOINT ?? "http://host.docker.internal:8080/v1/chat/completions");
-  }
-  throw new Error(`Unknown source: ${name}`);
-}
-
-function readSecret(name: string): string {
-  const value = readFileSync(join(secretsDirectory, name), "utf8").trim();
-  if (value.length === 0) throw new Error(`Secret file is empty: ${name}`);
-  return value;
 }
 
 async function readStandardInput(): Promise<string> {

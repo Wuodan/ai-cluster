@@ -67,8 +67,9 @@ test("advertised capability alone does not make a source suitable", async () => 
     requirements: { capabilities: ["structured_json"] },
   });
 
-  assert.deepEqual(result, {
+  assert.deepEqual({ ...result, requestId: undefined }, {
     status: "no_suitable_source",
+    requestId: undefined,
     requiredCapabilities: ["structured_json"],
   });
   assert.equal(source.calls, 0);

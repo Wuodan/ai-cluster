@@ -58,18 +58,23 @@ export interface InferenceSource {
 
 export interface SuccessfulInference {
   readonly status: "success";
+  readonly requestId: string;
   readonly sourceId: string;
   readonly model: string;
+  readonly resolvedModel?: string;
+  readonly accessPath: InferenceSource["accessPath"];
   readonly output: string;
 }
 
 export interface NoSourceSucceeded {
   readonly status: "no_source_succeeded";
+  readonly requestId: string;
   readonly outcomes: readonly AttemptOutcome[];
 }
 
 export interface NoSuitableSource {
   readonly status: "no_suitable_source";
+  readonly requestId: string;
   readonly requiredCapabilities: readonly Capability[];
   readonly minimumContextTokens?: number;
 }

@@ -14,6 +14,7 @@ export interface AttemptRecord {
   readonly attemptNumber: number;
   readonly sourceId: string;
   readonly model: string;
+  readonly resolvedModel?: string;
   readonly outcome: AttemptOutcome;
   readonly startedAtMs: number;
   readonly finishedAtMs: number;
@@ -90,8 +91,8 @@ export class ResourceStore {
         INSERT INTO attempts (
           id, request_id, attempt_number, source_id, model, outcome,
           started_at_ms, finished_at_ms, latency_ms, output,
-          error_code, error_message, quota_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          resolved_model, error_code, error_message, quota_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         id,
@@ -104,6 +105,7 @@ export class ResourceStore {
         attempt.finishedAtMs,
         attempt.latencyMs,
         attempt.output ?? null,
+        attempt.resolvedModel ?? null,
         attempt.errorCode ?? null,
         attempt.errorMessage ?? null,
         attempt.quota === undefined ? null : JSON.stringify(attempt.quota),
@@ -121,11 +123,26 @@ export class ResourceStore {
     return rows.map((row) => this.#toStoredAttempt(row as Record<string, unknown>));
   }
 
+  async listRecentAttempts(limit: number): Promise<readonly StoredAttempt[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000) throw new Error("Invalid attempt limit");
+    const rows = this.#database.prepare(`
+      SELECT * FROM attempts ORDER BY started_at_ms DESC, attempt_number DESC LIMIT ?
+    `).all(limit);
+    return rows.map((row) => this.#toStoredAttempt(row as Record<string, unknown>));
+  }
+
   async getResourceState(resourceKey: string): Promise<ResourceStateRecord | undefined> {
     const row = this.#database
       .prepare("SELECT * FROM resource_states WHERE resource_key = ?")
       .get(resourceKey) as Record<string, unknown> | undefined;
     return row === undefined ? undefined : this.#toResourceState(row);
+  }
+
+  async listResourceStates(): Promise<readonly ResourceStateRecord[]> {
+    const rows = this.#database.prepare(`
+      SELECT * FROM resource_states ORDER BY source_id, model
+    `).all() as Record<string, unknown>[];
+    return rows.map((row) => this.#toResourceState(row));
   }
 
   async setResourceState(state: ResourceStateRecord): Promise<void> {
@@ -365,6 +382,24 @@ export class ResourceStore {
     return rows.map((row) => this.#toCapabilityEvidence(row as Record<string, unknown>));
   }
 
+  async listCurrentObservedCapabilityEvidence(resourceKey: string): Promise<readonly StoredCapabilityEvidence[]> {
+    const rows = this.#database.prepare(`
+      SELECT evidence.*
+      FROM capability_evidence AS evidence
+      WHERE evidence.resource_key = ?
+        AND evidence.evidence_kind = 'observed'
+        AND evidence.sequence = (
+          SELECT MAX(candidate.sequence)
+          FROM capability_evidence AS candidate
+          WHERE candidate.resource_key = evidence.resource_key
+            AND candidate.capability = evidence.capability
+            AND candidate.evidence_kind = evidence.evidence_kind
+        )
+      ORDER BY evidence.capability
+    `).all(resourceKey);
+    return rows.map((row) => this.#toCapabilityEvidence(row as Record<string, unknown>));
+  }
+
   async resourceMeetsRequirements(
     resourceKey: string,
     requirements: ResourceRequirements | undefined,
@@ -558,6 +593,11 @@ export class ResourceStore {
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (4);
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (5);
     `);
+    const attemptColumns = this.#database.prepare("PRAGMA table_info(attempts)").all() as { name: string }[];
+    if (!attemptColumns.some((column) => column.name === "resolved_model")) {
+      this.#database.exec("ALTER TABLE attempts ADD COLUMN resolved_model TEXT");
+    }
+    this.#database.prepare("INSERT OR IGNORE INTO schema_migrations (version) VALUES (6)").run();
   }
 
   #toStoredAttempt(row: Record<string, unknown>): StoredAttempt {

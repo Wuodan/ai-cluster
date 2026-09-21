@@ -52,10 +52,13 @@ test("falls back deterministically and records both attempts", async () => {
   const result = await loop.run({ prompt: "work", maxOutputTokens: 32 });
   const attempts = await store.listAttempts();
 
-  assert.deepEqual(result, {
+  assert.match(result.requestId, /^[0-9a-f-]{36}$/);
+  assert.deepEqual({ ...result, requestId: undefined }, {
     status: "success",
+    requestId: undefined,
     sourceId: "second",
     model: "free-b",
+    accessPath: "api",
     output: "done",
   });
   assert.equal(attempts.length, 2);
@@ -85,8 +88,10 @@ test("converts a thrown source error into durable evidence", async () => {
   const result = await loop.run({ prompt: "work", maxOutputTokens: 32 });
   const attempts = await store.listAttempts();
 
-  assert.deepEqual(result, {
+  assert.match(result.requestId, /^[0-9a-f-]{36}$/);
+  assert.deepEqual({ ...result, requestId: undefined }, {
     status: "no_source_succeeded",
+    requestId: undefined,
     outcomes: ["unknown_failure"],
   });
   assert.equal(attempts[0]?.errorMessage, "network down");
@@ -190,10 +195,12 @@ test("reconsiders and recovers a resource after cooldown", async () => {
   const state = await store.getResourceState(resourceKey(recovering));
   const transitions = await store.listStateTransitions(resourceKey(recovering));
 
-  assert.deepEqual(result, {
+  assert.deepEqual({ ...result, requestId: undefined }, {
     status: "success",
+    requestId: undefined,
     sourceId: "first",
     model: "free-a",
+    accessPath: "api",
     output: "recovered",
   });
   assert.equal(state?.state, "available");
@@ -239,7 +246,10 @@ test("retains cooldown across a process restart", async () => {
     const result = await secondLoop.run({ prompt: "work again", maxOutputTokens: 32 });
 
     assert.equal(shouldBeSkipped.calls, 0);
-    assert.deepEqual(result, { status: "no_source_succeeded", outcomes: [] });
+    assert.deepEqual(
+      { ...result, requestId: undefined },
+      { status: "no_source_succeeded", requestId: undefined, outcomes: [] },
+    );
     assert.equal((await reopenedStore.getResourceState(resourceKey(shouldBeSkipped)))?.state, "exhausted");
     reopenedStore.close();
   } finally {

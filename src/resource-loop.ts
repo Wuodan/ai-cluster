@@ -75,6 +75,7 @@ export class ResourceLoop {
         attemptNumber: index + 1,
         sourceId: source.id,
         model: source.model,
+        ...(result.resolvedModel === undefined ? {} : { resolvedModel: result.resolvedModel }),
         outcome: result.outcome,
         startedAtMs,
         finishedAtMs,
@@ -100,8 +101,11 @@ export class ResourceLoop {
       if (result.outcome === "success" && result.output !== undefined) {
         return {
           status: "success",
+          requestId,
           sourceId: source.id,
           model: source.model,
+          ...(result.resolvedModel === undefined ? {} : { resolvedModel: result.resolvedModel }),
+          accessPath: source.accessPath,
           output: result.output,
         };
       }
@@ -110,13 +114,14 @@ export class ResourceLoop {
     if (suitableResourceCount === 0) {
       return {
         status: "no_suitable_source",
+        requestId,
         requiredCapabilities: request.requirements?.capabilities ?? [],
         ...(request.requirements?.minimumContextTokens === undefined
           ? {}
           : { minimumContextTokens: request.requirements.minimumContextTokens }),
       };
     }
-    return { status: "no_source_succeeded", outcomes };
+    return { status: "no_source_succeeded", requestId, outcomes };
   }
 }
 
