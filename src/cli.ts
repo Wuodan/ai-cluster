@@ -3,20 +3,22 @@ import { join } from "node:path";
 
 import { evaluateSource } from "./capability.js";
 import { zeroCostResourceKeys } from "./policy.js";
+import { runRecovery } from "./recovery.js";
 import { capabilities, type Capability, type InferenceSource, type ResourceRequirements } from "./resource.js";
 import { ResourceLoop } from "./resource-loop.js";
 import { CodexCliSource } from "./sources/codex-cli.js";
 import { GroqSource } from "./sources/groq.js";
+import { LocalLlamaSource } from "./sources/local-llama.js";
 import { OpenRouterSource } from "./sources/openrouter.js";
 import { ResourceStore } from "./store.js";
 
 const secretsDirectory = process.env.AI_CLUSTER_SECRETS_DIR ?? "/run/secrets";
 const databasePath = process.env.AI_CLUSTER_DATABASE_PATH ?? "/data/resource-loop.sqlite";
-const sourceNames = (process.env.AI_CLUSTER_SOURCES ?? "openrouter,groq")
+const command = process.env.AI_CLUSTER_COMMAND ?? "infer";
+const sourceNames = (process.env.AI_CLUSTER_SOURCES ?? (command === "recover" ? "local" : "openrouter,groq"))
   .split(",")
   .map((name) => name.trim())
   .filter((name) => name.length > 0);
-const command = process.env.AI_CLUSTER_COMMAND ?? "infer";
 const sources = sourceNames.map(createSource);
 const store = new ResourceStore(databasePath);
 
@@ -50,6 +52,14 @@ try {
     });
     process.stdout.write(`${JSON.stringify(result)}\n`);
     if (result.status !== "success") process.exitCode = 1;
+  } else if (command === "recover") {
+    const observations = await readStandardInput();
+    if (observations.length === 0) throw new Error("Expected recovery observations on standard input");
+    const localSource = sources.find((source) => source.accessPath === "local");
+    if (localSource === undefined) throw new Error("Recovery requires a configured local source");
+    const result = await runRecovery({ observations, source: localSource, store });
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    if (result.outcome !== "persisted") process.exitCode = 1;
   } else {
     throw new Error(`Unknown command: ${command}`);
   }
@@ -89,6 +99,9 @@ function createSource(name: string): InferenceSource {
   }
   if (name === "codex") {
     return new CodexCliSource();
+  }
+  if (name === "local") {
+    return new LocalLlamaSource(process.env.AI_CLUSTER_LOCAL_ENDPOINT ?? "http://host.docker.internal:8080/v1/chat/completions");
   }
   throw new Error(`Unknown source: ${name}`);
 }

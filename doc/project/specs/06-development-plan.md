@@ -63,10 +63,8 @@ of its free-tier classification after funding. The successful test response did 
 the exact allowance remains policy evidence rather than a directly observed quota value. This uncertainty is recorded
 rather than blocking the resource-loop implementation.
 
-The provisional local fallback candidate is a CPU-only `llama.cpp` server running a quantized Qwen3 1.7B model. Its
-currently packaged quantized model is approximately 1.4 GB. Qwen3 4B, at approximately 2.5 GB, is the stronger comparison
-candidate if the smaller model cannot perform the recovery tasks. Selection is intentionally provisional until Milestone
-5 defines and evaluates those tasks.
+The provisional local fallback candidate was a CPU-only `llama.cpp` server running a quantized Qwen3 1.7B model. Qwen3
+4B Q4_K_M was selected in Milestone 5 after the smaller model failed one of the defined recovery cases.
 
 ## Milestone 1: minimal persistent resource loop
 
@@ -257,6 +255,25 @@ known external pool is unusable.
   produces clear evidence of the remaining manual obstacle.
 
 Fully autonomous provider registration and adapter generation are not required for this milestone.
+
+### Current status
+
+The milestone is complete. Recovery is a narrow, non-authoritative operation: a local model interprets bounded sanitized
+observations and emits a strict proposal, while deterministic code validates and durably stores both the raw and parsed
+result. It cannot qualify a source, access credentials, register an account, or authorize spending.
+
+The selected fallback is Qwen3 4B Q4_K_M behind the CPU-only `llama.cpp` server. Its published model file is 2.5 GB and
+the live container used approximately 2.05 GiB resident memory after inference with a 2048-token context. The smaller
+Qwen3 1.7B candidate was rejected after it mislabeled a pure quota-reset case as a new candidate.
+
+In controlled exercises with all external sources unavailable, the selected model correctly distinguished a temporary
+429/reset condition, an unverified candidate that can be probed without human action, and a candidate blocked on account
+creation. All three results survived in SQLite with their original observations and outputs. Candidate claims remain
+untrusted and generate qualification steps; they do not enter the usable resource pool automatically.
+
+The current research boundary accepts text captured by deterministic inspection through standard input. Autonomous web
+fetching is deferred until an allowlisted, size-bounded, prompt-injection-aware collector exists. Detailed measurements,
+commands, limitations, and the controlled inputs are recorded in `09-local-recovery-observations.md`.
 
 ## Milestone 6: early resource service
 

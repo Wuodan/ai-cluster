@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import type { CapabilityEvidence, EvidenceKind } from "./capability.js";
 import type { CatalogEntry, CatalogStatus } from "./catalog.js";
 import type { AttemptOutcome, Capability, QuotaEvidence, ResourceRequirements } from "./resource.js";
+import type { RecoveryProposal } from "./recovery.js";
 import type { ResourceState, ResourceStateRecord } from "./resource-state.js";
 
 export interface AttemptRecord {
@@ -48,6 +49,20 @@ export interface StoredCapabilityEvidence extends CapabilityEvidence {
   readonly id: string;
   readonly sequence: number;
   readonly resourceKey: string;
+}
+
+export interface RecoveryFindingRecord {
+  readonly sourceId: string;
+  readonly model: string;
+  readonly observations: string;
+  readonly rawOutput: string;
+  readonly proposal?: RecoveryProposal;
+  readonly parseStatus: "valid" | "invalid" | "inference_failed";
+  readonly observedAtMs: number;
+}
+
+export interface StoredRecoveryFinding extends RecoveryFindingRecord {
+  readonly id: string;
 }
 
 export class ResourceStore {
@@ -370,6 +385,43 @@ export class ResourceStore {
     return true;
   }
 
+  async recordRecoveryFinding(finding: RecoveryFindingRecord): Promise<string> {
+    const id = randomUUID();
+    this.#database.prepare(`
+      INSERT INTO recovery_findings (
+        id, source_id, model, observations, raw_output, proposal_json, parse_status, observed_at_ms
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      finding.sourceId,
+      finding.model,
+      finding.observations,
+      finding.rawOutput,
+      finding.proposal === undefined ? null : JSON.stringify(finding.proposal),
+      finding.parseStatus,
+      finding.observedAtMs,
+    );
+    return id;
+  }
+
+  async listRecoveryFindings(): Promise<readonly StoredRecoveryFinding[]> {
+    const rows = this.#database.prepare(`
+      SELECT * FROM recovery_findings ORDER BY observed_at_ms, id
+    `).all() as Record<string, unknown>[];
+    return rows.map((row) => ({
+      id: row.id as string,
+      sourceId: row.source_id as string,
+      model: row.model as string,
+      observations: row.observations as string,
+      rawOutput: row.raw_output as string,
+      ...(row.proposal_json === null
+        ? {}
+        : { proposal: JSON.parse(row.proposal_json as string) as RecoveryProposal }),
+      parseStatus: row.parse_status as RecoveryFindingRecord["parseStatus"],
+      observedAtMs: row.observed_at_ms as number,
+    }));
+  }
+
   #migrate(): void {
     this.#database.exec(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -486,10 +538,25 @@ export class ResourceStore {
       CREATE INDEX IF NOT EXISTS capability_evidence_latest
         ON capability_evidence (resource_key, capability, evidence_kind, sequence DESC);
 
+      CREATE TABLE IF NOT EXISTS recovery_findings (
+        id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        model TEXT NOT NULL,
+        observations TEXT NOT NULL,
+        raw_output TEXT NOT NULL,
+        proposal_json TEXT,
+        parse_status TEXT NOT NULL CHECK (parse_status IN ('valid', 'invalid', 'inference_failed')),
+        observed_at_ms INTEGER NOT NULL
+      ) STRICT;
+
+      CREATE INDEX IF NOT EXISTS recovery_findings_time
+        ON recovery_findings (observed_at_ms);
+
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (1);
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (2);
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (3);
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (4);
+      INSERT OR IGNORE INTO schema_migrations (version) VALUES (5);
     `);
   }
 

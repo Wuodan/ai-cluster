@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { GroqSource } from "../src/sources/groq.js";
+import { LocalLlamaSource } from "../src/sources/local-llama.js";
 import { OpenRouterSource } from "../src/sources/openrouter.js";
 
 test("OpenRouter fixes the model and requires reported zero cost", async () => {
@@ -53,4 +54,21 @@ test("rate limiting is classified as exhaustion", async () => {
   assert.equal(result.outcome, "exhausted");
   assert.equal(result.errorCode, "rate_limit_exceeded");
   assert.equal(result.quota?.raw?.["retry-after"], "60");
+});
+
+test("local llama uses its fixed model without a credential", async () => {
+  let authorization: string | null = null;
+  let body: { model?: string } = {};
+  const source = new LocalLlamaSource("http://local.test/v1/chat/completions", async (_input, init) => {
+    authorization = new Headers(init?.headers).get("authorization");
+    body = JSON.parse(String(init?.body)) as { model?: string };
+    return Response.json({ model: "loaded-local-model", choices: [{ message: { content: "ok" } }] });
+  });
+
+  const result = await source.invoke({ prompt: "hello", maxOutputTokens: 10 });
+
+  assert.equal(body.model, "qwen3-4b-q4_k_m");
+  assert.equal(authorization, null);
+  assert.equal(result.outcome, "success");
+  assert.equal(result.resolvedModel, "loaded-local-model");
 });

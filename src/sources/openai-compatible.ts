@@ -17,7 +17,7 @@ interface ChatCompletionResponse {
 }
 
 export async function invokeOpenAiCompatible(options: {
-  readonly apiKey: string;
+  readonly apiKey?: string;
   readonly endpoint: string;
   readonly fetch: Fetch;
   readonly maxOutputTokens: number;
@@ -29,7 +29,7 @@ export async function invokeOpenAiCompatible(options: {
   const response = await options.fetch(options.endpoint, {
     method: "POST",
     headers: {
-      authorization: `Bearer ${options.apiKey}`,
+      ...(options.apiKey === undefined ? {} : { authorization: `Bearer ${options.apiKey}` }),
       "content-type": "application/json",
     },
     body: JSON.stringify({

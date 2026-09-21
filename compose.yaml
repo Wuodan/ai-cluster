@@ -1,0 +1,34 @@
+services:
+  local-llama:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    command:
+      - -hf
+      - ggml-org/Qwen3-4B-GGUF:Q4_K_M
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --ctx-size
+      - "2048"
+      - --parallel
+      - "1"
+    volumes:
+      - model-cache:/root/.cache/huggingface
+
+  resource-manager:
+    profiles: [tools]
+    build: .
+    environment:
+      AI_CLUSTER_COMMAND: ${AI_CLUSTER_COMMAND:-recover}
+      AI_CLUSTER_LOCAL_ENDPOINT: http://local-llama:8080/v1/chat/completions
+      AI_CLUSTER_SOURCES: local
+    volumes:
+      - resource-data:/data
+    depends_on:
+      - local-llama
+
+volumes:
+  model-cache:
+    name: ai-cluster-model-cache
+  resource-data:
+    name: ai-cluster-resource-data
