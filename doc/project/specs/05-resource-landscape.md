@@ -21,7 +21,7 @@ An initial resource is useful when it provides several of the following:
 The initial set should not consist solely of aliases for the same underlying provider. Correlated failures would create
 the appearance of a pool without providing real redundancy.
 
-## Strong initial candidates
+## Investigated candidates
 
 ### OpenRouter free models
 
@@ -48,34 +48,36 @@ Limitations:
 - Different free models may have different context, privacy, and tool-use characteristics.
 - Failed or poorly chosen requests can consume scarce daily capacity.
 
-[OpenRouter guardrails](https://openrouter.ai/docs/guides/features/guardrails/overview) can restrict an API key to an
-explicit model allowlist independently of application code. A funded project account should disable automatic top-up,
-avoid retaining a reusable payment method where possible, and apply a provider-side allowlist containing only the free
-router and/or verified `:free` model identifiers. The exact protection must be tested before the account is automated.
+[OpenRouter's documentation describes model allowlists](https://openrouter.ai/docs/guides/features/guardrails/overview),
+but the project account's current Privacy UI exposes only a prompt-injection guardrail, not model-access guardrails. The
+project must not assume that the documented model allowlist is available.
+
+Initially, the OpenRouter key should be held only by the trusted resource adapter, which permits exactly the
+`openrouter/free` model identifier. Agents and experimental code must not receive the key or supply an arbitrary model
+identifier. The project key currently has an account-side spending limit of $0; a free request succeeds despite that
+limit. This is the primary provider-side spending protection and must remain $0 after funding the account. Automatic
+top-up should be disabled, a reusable payment method should be removed where possible, and the parked balance should be
+monitored. Any balance decrease is a zero-spend invariant violation and should disable the source.
 
 Assessment: with a protected $10 deposit and 1,000 free requests per day, this becomes a strong initial source rather
 than merely a small bootstrap source.
 
-### Cerebras Inference free tier
+### Cerebras Inference (currently paid)
 
-[Cerebras documents a free API tier](https://inference-docs.cerebras.ai/support/rate-limits) with explicit request and
-token buckets. At the time of research, `gpt-oss-120b` has limits including 30 requests per minute, one million tokens per
-day, and 14,400 requests per day. Exact account limits remain authoritative and may differ.
+[Cerebras documents free-trial and paid tiers](https://inference-docs.cerebras.ai/models/overview), and its model table
+labels context lengths as "free / paid." This does not mean that current project accounts receive ongoing inference at
+zero cost.
 
-Why it is useful:
+The authenticated project catalog currently exposes only two models:
 
-- It is a direct provider independent of OpenRouter's account-level quota.
-- Its API is OpenAI-compatible.
-- Rate-limit headers and documented refill behavior provide useful observations for early state management.
-- The published free capacity is large enough for meaningful tests.
+- `gpt-oss-120b`, priced at $0.35/M input tokens and $0.75/M output tokens;
+- `qwen-3.8-27b`, priced at $0.99/M input tokens and $1.49/M output tokens.
 
-Limitations:
+Both models returned `402 payment_required` through two valid API keys. Cerebras also describes Qwen 3.8 27B as a PayGo
+model in its authenticated interface.
 
-- The free model set and limits can be temporarily reduced under demand.
-- A small number of available models provides limited diversity.
-- Published limits must still be verified against the actual project account.
-
-Assessment: probably the best first direct-provider companion to OpenRouter.
+Assessment: Cerebras is not currently a zero-cost source and is excluded from the initial implementation. It may be
+reconsidered if Cerebras offers a new free trial or tier later.
 
 ### OpenCode Zen free models
 
@@ -123,7 +125,19 @@ Limitations:
 
 Assessment: a strong additional source after the hard zero-spend boundary has been verified.
 
-## Additional candidates
+The dedicated project has now been tested without a linked billing account. Its API key authenticated, and
+`gemini-3.6-flash` completed a generation request successfully. Google's current pricing page lists that model's standard
+input and output as free of charge on the free tier. The API did not return remaining-quota headers; Google states that
+active project-specific limits are visible in AI Studio.
+
+The models endpoint also advertised `gemini-2.5-flash`, but an inference request reported that the model is unavailable
+to new users and recommended `gemini-3.6-flash`. The resource manager must therefore probe actual usability rather than
+treating model-list membership as sufficient evidence.
+
+Assessment: a verified third independent source with a hard zero-spend boundary supplied by the absence of linked
+billing. Its free-tier data treatment makes it unsuitable for private source code unless that policy changes.
+
+## Further candidates
 
 These are worth retaining in the research queue, but they need not be part of the first implementation.
 
@@ -131,7 +145,8 @@ These are worth retaining in the research queue, but they need not be part of th
 
 [Groq publishes free-tier limits and rate-limit response headers](https://console.groq.com/docs/rate-limits). Its direct,
 OpenAI-compatible API and explicit remaining/reset headers make integration straightforward. Its model selection overlaps
-with other providers, but the account quota and serving infrastructure are independent.
+with other providers, but the account quota and serving infrastructure are independent. A project-account probe has now
+successfully used `openai/gpt-oss-120b` and observed request and token limits in the response headers.
 
 ### Cloudflare Workers AI
 
@@ -165,15 +180,15 @@ The first experiments should attempt to verify:
 
 1. **OpenRouter free models** on a dedicated account with a protected $10 deposit, as a rotating aggregator with up to
    1,000 free requests per day.
-2. **Cerebras free tier** as an independent, higher-capacity direct provider with observable limits.
-3. **An additional direct provider**, initially Gemini or Groq, to ensure the pool is not merely different routes into
-   the same underlying allowance.
+2. **Groq free tier** as a verified independent direct provider with observable limits.
+3. **Gemini Developer API free tier**, now verified as a third independent direct provider.
 4. **A small local model** as the always-available fallback; model selection is deferred until its concrete recovery tasks
    are clearer.
 
-OpenCode Zen, Cloudflare, Hugging Face, and NVIDIA form a useful later discovery set. The first prototype does not need to
-integrate every readily available API. Its purpose is to prove heterogeneous observation and switching without building
-a static catalog that will immediately become obsolete.
+OpenCode Zen, Cerebras, Cloudflare, Hugging Face, and NVIDIA form a useful later discovery set. Cerebras remains in that
+set because its documented free tier may become available even though the project account currently receives a
+payment-required response. The first prototype does not need to integrate every readily available API. Its purpose is to
+prove heterogeneous observation and switching without building a static catalog that will immediately become obsolete.
 
 ## Verification still required
 
@@ -181,7 +196,7 @@ Before implementation relies on any external candidate, a project-owned account 
 
 - whether billing details are required;
 - whether accidental paid usage is technically possible;
-- whether provider-side model restrictions prevent consumption of parked credit;
+- whether any account-side spending limit can additionally protect the parked credit;
 - available models and their current zero-price status;
 - actual account-specific request and token limits;
 - response headers and error bodies near exhaustion;

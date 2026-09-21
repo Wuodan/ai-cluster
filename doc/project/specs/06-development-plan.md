@@ -25,14 +25,17 @@ spending, and their important operational behavior can be observed.
 
 ### Work
 
-- Create or designate project accounts for OpenRouter and Cerebras.
+- Create or designate project accounts for OpenRouter and Groq.
 - For OpenRouter, consider a dedicated $10-funded account to unlock the larger free-model allowance.
-- Before using that account, disable automatic top-up and apply a provider-side guardrail that permits only verified
-  free routes or model identifiers.
+- Before using that account, disable automatic top-up and remove a reusable payment method where possible.
+- Keep the project API key's account-side spending limit at $0 and verify it again after adding account credit.
+- Keep its API key inside the trusted OpenRouter adapter and initially permit only the exact `openrouter/free` model
+  identifier. Do not expose the key or arbitrary model selection to agents or experimental code.
 - Do not attach a payment method unless zero paid usage can still be guaranteed independently of application logic.
 - Probe each source manually with a minimal request.
 - Record current models, limits, headers, representative responses, exhaustion errors, and recovery behavior.
 - Check whether an account or provider can silently select a paid model or paid fallback.
+- Record the OpenRouter balance before and after free-model probes; any decrease is a failed safety check.
 - Select an initial local runtime and small fallback-model candidate for later testing.
 
 ### Exit criteria
@@ -40,7 +43,9 @@ spending, and their important operational behavior can be observed.
 - Two independent external sources have successfully answered test requests at zero cost.
 - At least one source exposes useful quota or reset observations.
 - The project has a documented way to guarantee that the test credentials cannot create charges.
-- OpenRouter's parked credit cannot be consumed through the key intended for the project.
+- OpenRouter free-model probes leave the parked balance unchanged, and no untrusted caller can submit an arbitrary model
+  identifier through the project key.
+- The OpenRouter project key reports a $0 spending limit after the account has been funded.
 - Unknown behavior is explicitly recorded rather than guessed.
 
 This milestone includes manual work. Automating discovery before understanding even two concrete sources would hide the
@@ -219,9 +224,9 @@ The first two project accounts should be:
 
 1. OpenRouter, preferably dedicated to the project, with a protected $10 deposit to unlock the larger free-model
    allowance;
-2. Cerebras, providing an independent direct free tier.
+2. Groq, providing a verified independent direct free tier with observable request and token limits.
 
-Gemini or Groq can be added after those two have been verified. OpenCode does not require investigation for Milestone 0:
+Gemini can be added after those two have been verified. OpenCode does not require investigation for Milestone 0:
 using OpenCode with an OpenRouter account does not create a separate inference resource.
 
 Accounts and API keys should be owned or explicitly supplied by the project owner. Account creation does not need to be
