@@ -95,6 +95,19 @@ source when the preferred one cannot serve a request.
 
 The selection policy may initially be simple and deterministic. Intelligent triage is not needed to prove switching.
 
+### Current status
+
+The milestone is complete. The implementation uses Node.js 24, TypeScript, and Node's built-in SQLite module behind a
+small domain-oriented store. SQLite is an initial single-host choice, not a permanent architectural dependency; IDs,
+timestamps, store operations, and transaction boundaries should remain straightforward to move to PostgreSQL if
+multi-process or multi-host operation later requires it.
+
+The resource loop has fixed-model adapters for OpenRouter and Groq, a static zero-cost allowlist, normalized outcomes,
+deterministic fallback, durable attempt and quota evidence, and fake-source tests. Both real adapters have completed
+requests from the host and from the built OCI image. The container reads individual credentials through read-only secret
+mounts and retains its SQLite history on a separate data volume. A restart test verifies that observations survive closing
+and reopening the store.
+
 ## Milestone 2: live availability and recovery
 
 ### Hypothesis
@@ -295,4 +308,4 @@ prompts, or other sensitive metadata. Curated and deliberately redacted examples
 test fixtures when useful. Redaction must remove at least credentials, account and project identifiers, request IDs,
 private prompts or code, and unnecessary exact usage history.
 
-The implementation language does not need to be chosen until Milestone 1.
+The implementation language selected in Milestone 1 is TypeScript on Node.js 24.
