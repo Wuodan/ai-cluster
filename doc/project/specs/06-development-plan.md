@@ -1,0 +1,220 @@
+# Initial development plan
+
+This plan covers the path from an empty repository to an early usable resource loop. It deliberately postpones the
+autonomous coding engine, autonomous laboratory, and self-development system until the project can reliably obtain and
+manage zero-cost intelligence.
+
+The plan is hypothesis-driven. Each milestone should prove something about the project rather than merely add
+components.
+
+## Governing constraints
+
+- The system must never incur monetary usage.
+- External resources are assumed to change or disappear.
+- Resource observations must survive process restarts.
+- A resource's own claim that it is free is insufficient when paid fallback remains possible.
+- Failure and exhaustion are normal states, not exceptional crashes.
+- Early implementation should remain small enough to replace as the problem becomes better understood.
+
+## Milestone 0: empirical source verification
+
+### Hypothesis
+
+At least two independent, capable external LLM resources can currently be accessed programmatically without monetary
+spending, and their important operational behavior can be observed.
+
+### Work
+
+- Create or designate project accounts for OpenRouter and Cerebras.
+- For OpenRouter, consider a dedicated $10-funded account to unlock the larger free-model allowance.
+- Before using that account, disable automatic top-up and apply a provider-side guardrail that permits only verified
+  free routes or model identifiers.
+- Do not attach a payment method unless zero paid usage can still be guaranteed independently of application logic.
+- Probe each source manually with a minimal request.
+- Record current models, limits, headers, representative responses, exhaustion errors, and recovery behavior.
+- Check whether an account or provider can silently select a paid model or paid fallback.
+- Select an initial local runtime and small fallback-model candidate for later testing.
+
+### Exit criteria
+
+- Two independent external sources have successfully answered test requests at zero cost.
+- At least one source exposes useful quota or reset observations.
+- The project has a documented way to guarantee that the test credentials cannot create charges.
+- OpenRouter's parked credit cannot be consumed through the key intended for the project.
+- Unknown behavior is explicitly recorded rather than guessed.
+
+This milestone includes manual work. Automating discovery before understanding even two concrete sources would hide the
+problem behind premature abstractions.
+
+## Milestone 1: minimal persistent resource loop
+
+### Hypothesis
+
+A small deterministic program can invoke multiple heterogeneous sources, persist what happened, and select another
+source when the preferred one cannot serve a request.
+
+### Work
+
+- Choose the implementation language and minimal project structure.
+- Define the smallest useful request and result representation.
+- Implement two source integrations from Milestone 0.
+- Represent at least these outcomes: success, unavailable, exhausted, rejected, malformed response, and unknown failure.
+- Persist attempts, timestamps, selected source/model, outcome, latency, and available quota/reset evidence.
+- Implement deterministic source selection and fallback.
+- Add a fake source so exhaustion, failure, and recovery can be tested without consuming real allowances.
+- Enforce an allowlist of zero-cost endpoints and models.
+
+### Exit criteria
+
+- A request succeeds through either of two real independent sources.
+- A simulated or real exhaustion causes selection of the other source without losing the original failure evidence.
+- Restarting the program retains the observation history.
+- No configured execution path can select a model known to have non-zero pricing.
+
+The selection policy may initially be simple and deterministic. Intelligent triage is not needed to prove switching.
+
+## Milestone 2: live availability and recovery
+
+### Hypothesis
+
+The resource loop can distinguish temporary exhaustion from permanent or unknown failure well enough to stop wasting
+requests and later reuse recovered capacity.
+
+### Work
+
+- Introduce explicit observed states such as unknown, available, degraded, exhausted, cooling down, and disabled.
+- Interpret documented rate-limit and reset signals where available.
+- Use bounded probing and backoff where reset information is absent.
+- Prevent retry storms and repeated consumption of scarce allowance.
+- Reconsider cooled-down resources when evidence says they may have recovered.
+- Record state transitions and the observations that caused them.
+- Exercise at least one real quota reset or refill cycle.
+
+### Exit criteria
+
+- An exhausted source is not selected repeatedly for normal requests.
+- A recovered source returns to service without manual state editing.
+- Restarting during cooldown preserves correct behavior.
+- The state history explains why a source was avoided and later retried.
+
+## Milestone 3: changing catalogs and tool-mediated access
+
+### Hypothesis
+
+The resource loop can handle more than a fixed list of OpenAI-compatible endpoints.
+
+### Work
+
+- Read and compare a provider's live model catalog with previously observed models.
+- Detect a free model appearing, disappearing, or changing price/status.
+- Quarantine newly discovered models until their zero-cost status and minimal behavior have been checked.
+- Add one command/process-mediated resource, with OpenCode as the initial candidate.
+- Capture process exit, structured output where available, rate-limit messages, authentication failure, and partial work.
+- Keep the coding agent's execution semantics outside the generic resource observation core.
+
+### Exit criteria
+
+- Catalog changes become persisted observations rather than requiring a source-code edit.
+- A newly absent or non-free model is not selected.
+- The system can obtain and classify a result from one non-HTTP or agent-mediated access path.
+- Failure of that process does not corrupt the resource loop.
+
+## Milestone 4: capability evidence and task-aware selection
+
+### Hypothesis
+
+The system can make better choices than a fixed priority list by using durable evidence about resource capabilities and
+past outcomes.
+
+### Work
+
+- Define a small evaluation suite covering the capabilities needed by resource management.
+- Preserve test inputs, outputs, evaluator decisions, model identity, access path, and time.
+- Separate advertised capability from observed capability.
+- Allow task requests to state requirements such as tool use, structured output, context size, or coding quality.
+- Select only resources with adequate current evidence.
+- Use an LLM for comparative judgment only where deterministic evaluation is insufficient, and retain its rationale and
+  uncertainty.
+
+### Exit criteria
+
+- The same request requirements can lead to different resource choices based on recorded evidence.
+- A model that fails a required capability is not selected merely because it is available.
+- Re-evaluation can supersede stale evidence without deleting history.
+- The system can conclude that no currently available resource is suitable.
+
+## Milestone 5: local fallback and resource recovery
+
+### Hypothesis
+
+A model fitting approximately 1--4 GB of RAM can assist deterministic tools in restoring external capability when the
+known external pool is unusable.
+
+### Work
+
+- Turn the abstract recovery role into a small set of concrete tasks.
+- Evaluate local model and runtime candidates against those tasks.
+- Give the fallback narrowly scoped research and inspection tools.
+- Simulate loss of every configured external source.
+- Have the recovery path produce durable candidate-source findings and qualification steps.
+- Where safe and feasible, use a recovered external model to continue deeper qualification.
+
+### Exit criteria
+
+- The fallback runs within the agreed local resource budget.
+- With external sources disabled, it produces a useful, persisted recovery result rather than merely an error message.
+- At least one controlled exercise progresses from no usable external source to a qualified external candidate, or
+  produces clear evidence of the remaining manual obstacle.
+
+Fully autonomous provider registration and adapter generation are not required for this milestone.
+
+## Milestone 6: early resource service
+
+### Hypothesis
+
+The resource loop is reliable enough to supply an independent future work loop.
+
+### Work
+
+- Expose a stable local interface for requesting inference by requirements rather than provider name.
+- Return the selected source/model and relevant evidence with every result.
+- Provide current pool state, history, and a zero-spend audit.
+- Add bounded background maintenance for catalog refresh, probes, and re-evaluation.
+- Implement the explicit **cannot currently provide a suitable resource** result.
+- Run continuously long enough to encounter genuine provider changes, exhaustion, and recovery.
+
+### Exit criteria
+
+- A client can request suitable zero-cost intelligence without knowing provider-specific details.
+- The service survives restarts and expected source failures.
+- At least two external sources and the local fallback are represented in its persistent state.
+- It never substitutes paid inference when free capacity is unavailable.
+- A sustained run produces an understandable history of selections, failures, cooldowns, recoveries, and refusals.
+
+Reaching this milestone means the resource layer is usable in an early form. It does not mean the larger project is
+complete.
+
+## Deferred until after the early resource loop
+
+- A general autonomous coding-agent integration.
+- The work loop that chooses its own useful activities.
+- Human inboxes, review batching, and bounded speculative work.
+- The trusted-supervisor/autonomous-laboratory implementation.
+- Self-development and pull requests to the canonical repository.
+- Autonomous account creation.
+- Contributions to external projects.
+- Broad concurrency and distributed execution.
+
+These remain part of the concept. They are deferred because implementing them before the resource loop works would build
+the project on an unproven foundation.
+
+## Immediate next decisions
+
+Before Milestone 0 begins, the owner and project should decide:
+
+1. Which project accounts can be created now.
+2. What local hardware and operating systems the first prototype must run on.
+3. Where secrets may be stored during the manual verification phase.
+4. Whether account-specific observations may be committed after secret values are removed.
+
+The implementation language does not need to be chosen until Milestone 1.

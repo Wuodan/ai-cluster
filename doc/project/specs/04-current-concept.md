@@ -28,6 +28,9 @@ Existing hardware, electricity, internet access, and accounts supplied by the ow
 promotional allowances, free tiers, aggregators, locally hosted models, and models bundled with tools such as coding
 agents may all be potential resources.
 
+A one-time owner-funded account deposit that remains unspent may also be acceptable as setup infrastructure. It does not
+turn paid inference into an allowed resource: the system must be technically prevented from consuming the deposit.
+
 Repeated sign-up schemes intended to multiply a provider's allowance are out of scope for now. Autonomous registration
 of legitimate new accounts may be useful if it becomes technically feasible. The precise policy concerning provider
 terms has not yet been decided, but the project is not intended to rely on hacking providers or criminal activity.
