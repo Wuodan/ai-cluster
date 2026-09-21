@@ -169,6 +169,18 @@ The resource loop can handle more than a fixed list of OpenAI-compatible endpoin
 - The system can obtain and classify a result from one non-HTTP or agent-mediated access path.
 - Failure of that process does not corrupt the resource loop.
 
+### Current progress
+
+The catalog half is implemented. A successful OpenRouter snapshot retains only `:free` model identifiers and verifies
+that both prompt and completion prices parse to zero. Newly discovered or reappearing models are quarantined. A model is
+selectable only after a separate successful qualification, and it becomes unavailable or rejected when it disappears or
+reports non-zero pricing. Snapshots and meaningful status changes are persisted.
+
+The first live snapshot observed 21 zero-priced free-model entries. All 21 were quarantined and none was selectable.
+Tests verify discovery, qualification, disappearance, price changes, and selection exclusion. This work is committed
+separately from the still-pending command/process-mediated resource. OpenCode is not installed in the current environment,
+and the available Codex CLI is not treated as an independent free resource.
+
 ## Milestone 4: capability evidence and task-aware selection
 
 ### Hypothesis

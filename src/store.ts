@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+import type { CatalogEntry, CatalogStatus } from "./catalog.js";
 import type { AttemptOutcome, QuotaEvidence } from "./resource.js";
 import type { ResourceState, ResourceStateRecord } from "./resource-state.js";
 
@@ -32,6 +33,14 @@ export interface StateTransitionRecord {
   readonly observedAtMs: number;
   readonly retryAtMs?: number;
   readonly reason: string;
+}
+
+export interface CatalogModelRecord extends CatalogEntry {
+  readonly sourceId: string;
+  readonly status: CatalogStatus;
+  readonly firstSeenAtMs: number;
+  readonly lastSeenAtMs: number;
+  readonly statusReason: string;
 }
 
 export class ResourceStore {
@@ -171,6 +180,108 @@ export class ResourceStore {
     }));
   }
 
+  async applyCatalogSnapshot(
+    sourceId: string,
+    entries: readonly CatalogEntry[],
+    observedAtMs: number,
+  ): Promise<void> {
+    this.#database.exec("BEGIN IMMEDIATE");
+    try {
+      const existingRows = this.#database
+        .prepare("SELECT * FROM catalog_models WHERE source_id = ?")
+        .all(sourceId) as Record<string, unknown>[];
+      const existing = new Map(existingRows.map((row) => [row.model_id as string, row]));
+      const seen = new Set<string>();
+
+      for (const entry of entries) {
+        if (seen.has(entry.modelId)) throw new Error(`Duplicate catalog model: ${entry.modelId}`);
+        seen.add(entry.modelId);
+        const previous = existing.get(entry.modelId);
+        const previousStatus = previous?.status as CatalogStatus | undefined;
+        const previousZeroCost = previous === undefined ? undefined : (previous.zero_cost as number) === 1;
+        const status = catalogStatusAfterObservation(previousStatus, previousZeroCost, entry.zeroCost);
+        const reason = catalogReason(previousStatus, previousZeroCost, entry.zeroCost);
+
+        this.#database.prepare(`
+          INSERT INTO catalog_models (
+            source_id, model_id, zero_cost, status, first_seen_at_ms,
+            last_seen_at_ms, status_reason, metadata_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT (source_id, model_id) DO UPDATE SET
+            zero_cost = excluded.zero_cost,
+            status = excluded.status,
+            last_seen_at_ms = excluded.last_seen_at_ms,
+            status_reason = excluded.status_reason,
+            metadata_json = excluded.metadata_json
+        `).run(
+          sourceId,
+          entry.modelId,
+          entry.zeroCost ? 1 : 0,
+          status,
+          previous === undefined ? observedAtMs : previous.first_seen_at_ms as number,
+          observedAtMs,
+          reason,
+          JSON.stringify(entry.metadata),
+        );
+
+        if (previous === undefined || previousStatus !== status || previousZeroCost !== entry.zeroCost) {
+          this.#insertCatalogEvent(sourceId, entry.modelId, status, reason, observedAtMs);
+        }
+      }
+
+      for (const [modelId, previous] of existing) {
+        if (seen.has(modelId) || previous.status === "unavailable") continue;
+        this.#database.prepare(`
+          UPDATE catalog_models
+          SET status = 'unavailable', status_reason = 'absent_from_catalog'
+          WHERE source_id = ? AND model_id = ?
+        `).run(sourceId, modelId);
+        this.#insertCatalogEvent(sourceId, modelId, "unavailable", "absent_from_catalog", observedAtMs);
+      }
+
+      this.#database.prepare(`
+        INSERT INTO catalog_snapshots (id, source_id, observed_at_ms, model_count)
+        VALUES (?, ?, ?, ?)
+      `).run(randomUUID(), sourceId, observedAtMs, entries.length);
+      this.#database.exec("COMMIT");
+    } catch (error: unknown) {
+      this.#database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  async qualifyCatalogModel(sourceId: string, modelId: string, observedAtMs: number): Promise<void> {
+    const result = this.#database.prepare(`
+      UPDATE catalog_models
+      SET status = 'qualified', status_reason = 'probe_succeeded', last_seen_at_ms = ?
+      WHERE source_id = ? AND model_id = ? AND zero_cost = 1 AND status = 'quarantined'
+    `).run(observedAtMs, sourceId, modelId);
+    if (result.changes !== 1) throw new Error(`Catalog model is not eligible for qualification: ${sourceId}:${modelId}`);
+    this.#insertCatalogEvent(sourceId, modelId, "qualified", "probe_succeeded", observedAtMs);
+  }
+
+  async listCatalogModels(sourceId: string): Promise<readonly CatalogModelRecord[]> {
+    const rows = this.#database
+      .prepare("SELECT * FROM catalog_models WHERE source_id = ? ORDER BY model_id")
+      .all(sourceId) as Record<string, unknown>[];
+    return rows.map((row) => ({
+      sourceId: row.source_id as string,
+      modelId: row.model_id as string,
+      zeroCost: (row.zero_cost as number) === 1,
+      status: row.status as CatalogStatus,
+      firstSeenAtMs: row.first_seen_at_ms as number,
+      lastSeenAtMs: row.last_seen_at_ms as number,
+      statusReason: row.status_reason as string,
+      metadata: JSON.parse(row.metadata_json as string) as Readonly<Record<string, unknown>>,
+    }));
+  }
+
+  async listSelectableCatalogModels(sourceId: string): Promise<readonly CatalogModelRecord[]> {
+    return (await this.listCatalogModels(sourceId)).filter(
+      (model) => model.zeroCost && model.status === "qualified",
+    );
+  }
+
   #migrate(): void {
     this.#database.exec(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -231,8 +342,37 @@ export class ResourceStore {
       CREATE INDEX IF NOT EXISTS transitions_resource_time
         ON state_transitions (resource_key, observed_at_ms);
 
+      CREATE TABLE IF NOT EXISTS catalog_models (
+        source_id TEXT NOT NULL,
+        model_id TEXT NOT NULL,
+        zero_cost INTEGER NOT NULL CHECK (zero_cost IN (0, 1)),
+        status TEXT NOT NULL CHECK (status IN ('quarantined', 'qualified', 'unavailable', 'rejected')),
+        first_seen_at_ms INTEGER NOT NULL,
+        last_seen_at_ms INTEGER NOT NULL,
+        status_reason TEXT NOT NULL,
+        metadata_json TEXT NOT NULL,
+        PRIMARY KEY (source_id, model_id)
+      ) STRICT;
+
+      CREATE TABLE IF NOT EXISTS catalog_events (
+        id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        model_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('quarantined', 'qualified', 'unavailable', 'rejected')),
+        reason TEXT NOT NULL,
+        observed_at_ms INTEGER NOT NULL
+      ) STRICT;
+
+      CREATE TABLE IF NOT EXISTS catalog_snapshots (
+        id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        observed_at_ms INTEGER NOT NULL,
+        model_count INTEGER NOT NULL CHECK (model_count >= 0)
+      ) STRICT;
+
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (1);
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (2);
+      INSERT OR IGNORE INTO schema_migrations (version) VALUES (3);
     `);
   }
 
@@ -268,4 +408,40 @@ export class ResourceStore {
       reason: row.reason as string,
     };
   }
+
+  #insertCatalogEvent(
+    sourceId: string,
+    modelId: string,
+    status: CatalogStatus,
+    reason: string,
+    observedAtMs: number,
+  ): void {
+    this.#database.prepare(`
+      INSERT INTO catalog_events (id, source_id, model_id, status, reason, observed_at_ms)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(randomUUID(), sourceId, modelId, status, reason, observedAtMs);
+  }
+}
+
+function catalogStatusAfterObservation(
+  previousStatus: CatalogStatus | undefined,
+  previousZeroCost: boolean | undefined,
+  zeroCost: boolean,
+): CatalogStatus {
+  if (!zeroCost) return "rejected";
+  if (previousStatus === "qualified" && previousZeroCost === true) return "qualified";
+  if (previousStatus === "quarantined" && previousZeroCost === true) return "quarantined";
+  return "quarantined";
+}
+
+function catalogReason(
+  previousStatus: CatalogStatus | undefined,
+  previousZeroCost: boolean | undefined,
+  zeroCost: boolean,
+): string {
+  if (!zeroCost) return "non_zero_price";
+  if (previousStatus === undefined) return "new_model";
+  if (previousStatus === "unavailable") return "model_reappeared";
+  if (previousZeroCost === false) return "price_became_zero";
+  return previousStatus === "qualified" ? "qualification_retained" : "awaiting_qualification";
 }
