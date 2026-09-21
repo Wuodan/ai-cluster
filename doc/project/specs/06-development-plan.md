@@ -208,13 +208,67 @@ complete.
 These remain part of the concept. They are deferred because implementing them before the resource loop works would build
 the project on an unproven foundation.
 
-## Immediate next decisions
+## Initial operating defaults
 
-Before Milestone 0 begins, the owner and project should decide:
+The following defaults are sufficient to begin Milestone 0. They should be revised when experiments provide better
+evidence.
 
-1. Which project accounts can be created now.
-2. What local hardware and operating systems the first prototype must run on.
-3. Where secrets may be stored during the manual verification phase.
-4. Whether account-specific observations may be committed after secret values are removed.
+### Accounts
+
+The first two project accounts should be:
+
+1. OpenRouter, preferably dedicated to the project, with a protected $10 deposit to unlock the larger free-model
+   allowance;
+2. Cerebras, providing an independent direct free tier.
+
+Gemini or Groq can be added after those two have been verified. OpenCode does not require investigation for Milestone 0:
+using OpenCode with an OpenRouter account does not create a separate inference resource.
+
+Accounts and API keys should be owned or explicitly supplied by the project owner. Account creation does not need to be
+autonomous during initial development.
+
+### Deployment and minimum hardware target
+
+The prototype should target an OCI container on a Linux host and should not require a GPU. Development will occur on the
+owner's laptop, which has ample capacity. Exact host specifications are not an input to the initial design.
+
+Two provisional profiles make the requirement clearer:
+
+- **Resource manager without local inference:** 2 CPU cores, 2 GB RAM, and approximately 5 GB of storage.
+- **Resource manager with CPU-only fallback model:** 4 CPU cores, 8 GB RAM, and approximately 10--20 GB of storage.
+
+The second profile assumes a quantized small model whose weights occupy approximately 1--4 GB, plus memory for its
+runtime, the operating system, and the resource manager. Four GB of total system RAM may eventually be possible with a
+smaller model, but it should not be promised before the recovery tasks and candidate models have been tested.
+
+These are targets, not established minimums. Milestone 5 must measure and refine them. The eventual software should be
+suitable for a laptop or a small rented VM.
+
+### Secret storage
+
+Secrets must never be committed, placed in container images, written into ordinary configuration, or passed as command
+arguments that may appear in shell history or process listings.
+
+During manual verification:
+
+- credential files should live outside the repository in an owner-only directory;
+- directories should use mode `0700` and files mode `0600`;
+- containers should receive individual credentials as read-only mounted secret files under `/run/secrets`;
+- the program should read one credential per file and must never log its contents;
+- repository ignore rules should still reject common local secret files as a secondary safeguard.
+
+The exact host-side directory and secret-management product do not matter yet. A local owner-only directory is adequate
+for Milestone 0; a later deployment can use Docker, Podman, systemd, or cloud secret mechanisms without changing the
+program-facing `/run/secrets` convention.
+
+### Account-specific observations
+
+An account-specific observation is data such as an observed quota, remaining-request header, reset time, model list,
+rate-limit error, or provider response collected while testing a project account.
+
+Raw observations and logs should remain local because they may contain account identifiers, request identifiers,
+prompts, or other sensitive metadata. Curated and deliberately redacted examples may be committed as documentation or
+test fixtures when useful. Redaction must remove at least credentials, account and project identifiers, request IDs,
+private prompts or code, and unnecessary exact usage history.
 
 The implementation language does not need to be chosen until Milestone 1.
