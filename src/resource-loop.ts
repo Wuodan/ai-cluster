@@ -7,15 +7,18 @@ import type {
   InferenceSource,
   SourceResult,
 } from "./resource.js";
+import { decideResourceState } from "./resource-state.js";
 import type { ResourceStore } from "./store.js";
 
 export class ResourceLoop {
   readonly #sources: readonly InferenceSource[];
   readonly #store: ResourceStore;
+  readonly #now: () => number;
 
   constructor(options: {
     readonly sources: readonly InferenceSource[];
     readonly allowedResources: ReadonlySet<string>;
+    readonly now?: () => number;
     readonly store: ResourceStore;
   }) {
     for (const source of options.sources) {
@@ -27,6 +30,7 @@ export class ResourceLoop {
 
     this.#sources = options.sources;
     this.#store = options.store;
+    this.#now = options.now ?? Date.now;
   }
 
   async run(request: InferenceRequest): Promise<InferenceRunResult> {
@@ -34,7 +38,22 @@ export class ResourceLoop {
     const outcomes: AttemptOutcome[] = [];
 
     for (const [index, source] of this.#sources.entries()) {
-      const startedAtMs = Date.now();
+      const key = resourceKey(source);
+      let previousState = await this.#store.getResourceState(key);
+      const selectionTimeMs = this.#now();
+      if (previousState?.state === "disabled") continue;
+      if (previousState?.retryAtMs !== undefined && previousState.retryAtMs > selectionTimeMs) continue;
+      if (previousState !== undefined && previousState.state !== "available" && previousState.state !== "unknown") {
+        await this.#store.setResourceState({
+          ...previousState,
+          state: "unknown",
+          observedAtMs: selectionTimeMs,
+          reason: "cooldown_elapsed",
+        });
+        previousState = await this.#store.getResourceState(key);
+      }
+
+      const startedAtMs = this.#now();
       let result: SourceResult;
 
       try {
@@ -46,7 +65,7 @@ export class ResourceLoop {
         };
       }
 
-      const finishedAtMs = Date.now();
+      const finishedAtMs = this.#now();
       outcomes.push(result.outcome);
       await this.#store.recordAttempt({
         requestId,
@@ -61,6 +80,18 @@ export class ResourceLoop {
         ...(result.errorCode === undefined ? {} : { errorCode: result.errorCode }),
         ...(result.errorMessage === undefined ? {} : { errorMessage: result.errorMessage }),
         ...(result.quota === undefined ? {} : { quota: result.quota }),
+      });
+      const decision = decideResourceState(
+        result,
+        previousState?.consecutiveFailures ?? 0,
+        finishedAtMs,
+      );
+      await this.#store.setResourceState({
+        resourceKey: key,
+        sourceId: source.id,
+        model: source.model,
+        ...decision,
+        observedAtMs: finishedAtMs,
       });
 
       if (result.outcome === "success" && result.output !== undefined) {

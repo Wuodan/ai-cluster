@@ -77,6 +77,11 @@ headers provide useful direct evidence for early resource-state management. The 
 reported limits should be obtained from account documentation or longer observation rather than inferred from one
 response.
 
+During Milestone 2, two minimal requests were made four seconds apart, longer than the first response's reported token
+reset duration of approximately 2.31 seconds. The first response reported 7,692 of 8,000 tokens remaining. The second
+reported 7,732 remaining despite processing another request, directly demonstrating token-bucket refill. The independent
+request counter decreased from 999 to 998 as expected.
+
 ### Google Gemini Developer API
 
 - The dedicated project's API key authenticates successfully.

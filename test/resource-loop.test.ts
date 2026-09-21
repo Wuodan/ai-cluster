@@ -10,6 +10,7 @@ import { ResourceStore } from "../src/store.js";
 
 class FakeSource implements InferenceSource {
   readonly #results: SourceResult[];
+  calls = 0;
 
   constructor(
     readonly id: string,
@@ -20,6 +21,7 @@ class FakeSource implements InferenceSource {
   }
 
   async invoke(_request: InferenceRequest): Promise<SourceResult> {
+    this.calls += 1;
     const result = this.#results.shift();
     if (result === undefined) {
       throw new Error("No fake result configured");
@@ -121,6 +123,122 @@ test("retains attempts after the store is reopened", async () => {
     const attempts = await reopenedStore.listAttempts();
     assert.equal(attempts.length, 1);
     assert.equal(attempts[0]?.output, "persisted");
+    reopenedStore.close();
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("does not retry an exhausted resource before its persisted reset time", async () => {
+  const store = new ResourceStore(":memory:");
+  let nowMs = 1_000_000;
+  const exhausted = new FakeSource("first", "free-a", [
+    {
+      outcome: "exhausted",
+      errorCode: "rate_limit",
+      quota: { raw: { "retry-after": "60" } },
+    },
+  ]);
+  const fallback = new FakeSource("second", "free-b", [
+    { outcome: "success", output: "first fallback" },
+    { outcome: "success", output: "second fallback" },
+  ]);
+  const loop = new ResourceLoop({
+    sources: [exhausted, fallback],
+    allowedResources: new Set([resourceKey(exhausted), resourceKey(fallback)]),
+    now: () => nowMs,
+    store,
+  });
+
+  await loop.run({ prompt: "work", maxOutputTokens: 32 });
+  nowMs += 59_999;
+  const result = await loop.run({ prompt: "work again", maxOutputTokens: 32 });
+
+  assert.equal(exhausted.calls, 1);
+  assert.equal(fallback.calls, 2);
+  assert.equal(result.status, "success");
+  assert.equal((await store.getResourceState(resourceKey(exhausted)))?.state, "exhausted");
+  store.close();
+});
+
+test("reconsiders and recovers a resource after cooldown", async () => {
+  const store = new ResourceStore(":memory:");
+  let nowMs = 1_000_000;
+  const recovering = new FakeSource("first", "free-a", [
+    {
+      outcome: "exhausted",
+      errorCode: "rate_limit",
+      quota: { raw: { "retry-after": "60" } },
+    },
+    { outcome: "success", output: "recovered" },
+  ]);
+  const fallback = new FakeSource("second", "free-b", [
+    { outcome: "success", output: "fallback" },
+  ]);
+  const loop = new ResourceLoop({
+    sources: [recovering, fallback],
+    allowedResources: new Set([resourceKey(recovering), resourceKey(fallback)]),
+    now: () => nowMs,
+    store,
+  });
+
+  await loop.run({ prompt: "work", maxOutputTokens: 32 });
+  nowMs += 60_000;
+  const result = await loop.run({ prompt: "work again", maxOutputTokens: 32 });
+  const state = await store.getResourceState(resourceKey(recovering));
+  const transitions = await store.listStateTransitions(resourceKey(recovering));
+
+  assert.deepEqual(result, {
+    status: "success",
+    sourceId: "first",
+    model: "free-a",
+    output: "recovered",
+  });
+  assert.equal(state?.state, "available");
+  assert.equal(state?.consecutiveFailures, 0);
+  assert.deepEqual(transitions.map((transition) => transition.state), [
+    "exhausted",
+    "unknown",
+    "available",
+  ]);
+  store.close();
+});
+
+test("retains cooldown across a process restart", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "ai-cluster-cooldown-test-"));
+  const path = join(directory, "history.sqlite");
+  const nowMs = 1_000_000;
+
+  try {
+    const firstStore = new ResourceStore(path);
+    const exhausted = new FakeSource("source", "free-model", [
+      {
+        outcome: "exhausted",
+        quota: { raw: { "retry-after": "60" } },
+      },
+    ]);
+    const firstLoop = new ResourceLoop({
+      sources: [exhausted],
+      allowedResources: new Set([resourceKey(exhausted)]),
+      now: () => nowMs,
+      store: firstStore,
+    });
+    await firstLoop.run({ prompt: "work", maxOutputTokens: 32 });
+    firstStore.close();
+
+    const reopenedStore = new ResourceStore(path);
+    const shouldBeSkipped = new FakeSource("source", "free-model", []);
+    const secondLoop = new ResourceLoop({
+      sources: [shouldBeSkipped],
+      allowedResources: new Set([resourceKey(shouldBeSkipped)]),
+      now: () => nowMs + 30_000,
+      store: reopenedStore,
+    });
+    const result = await secondLoop.run({ prompt: "work again", maxOutputTokens: 32 });
+
+    assert.equal(shouldBeSkipped.calls, 0);
+    assert.deepEqual(result, { status: "no_source_succeeded", outcomes: [] });
+    assert.equal((await reopenedStore.getResourceState(resourceKey(shouldBeSkipped)))?.state, "exhausted");
     reopenedStore.close();
   } finally {
     rmSync(directory, { recursive: true, force: true });

@@ -132,6 +132,21 @@ requests and later reuse recovered capacity.
 - Restarting during cooldown preserves correct behavior.
 - The state history explains why a source was avoided and later retried.
 
+### Current status
+
+The milestone is complete. Resource state is persisted independently for each source/model as unknown, available,
+degraded, exhausted, cooling down, or disabled. Exhaustion honors explicit reset evidence when available; other temporary
+failures use bounded exponential cooldown. Rejected resources are disabled rather than retried automatically.
+
+Tests verify that an exhausted source is skipped before its retry time, that cooldown survives closing and reopening the
+database, and that a recovered source is automatically reconsidered. Every change is recorded with a per-resource
+transition sequence, previous state, reason, observation time, and optional retry time.
+
+A live Groq exercise also observed its token bucket refill between requests: after waiting longer than the returned token
+reset duration, remaining token capacity increased despite the second request consuming tokens. Deliberately exhausting
+the real daily request allocation was unnecessary; exhaustion and recovery behavior is exercised with controlled fake
+sources without wasting external capacity.
+
 ## Milestone 3: changing catalogs and tool-mediated access
 
 ### Hypothesis
