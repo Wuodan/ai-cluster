@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { zeroCostResourceKeys } from "./policy.js";
 import type { InferenceSource } from "./resource.js";
 import { ResourceLoop } from "./resource-loop.js";
+import { CodexCliSource } from "./sources/codex-cli.js";
 import { GroqSource } from "./sources/groq.js";
 import { OpenRouterSource } from "./sources/openrouter.js";
 import { ResourceStore } from "./store.js";
@@ -42,6 +43,9 @@ function createSource(name: string): InferenceSource {
   }
   if (name === "groq") {
     return new GroqSource(readSecret("groq_api_key"));
+  }
+  if (name === "codex") {
+    return new CodexCliSource();
   }
   throw new Error(`Unknown source: ${name}`);
 }

@@ -169,17 +169,25 @@ The resource loop can handle more than a fixed list of OpenAI-compatible endpoin
 - The system can obtain and classify a result from one non-HTTP or agent-mediated access path.
 - Failure of that process does not corrupt the resource loop.
 
-### Current progress
+### Current status
 
-The catalog half is implemented. A successful OpenRouter snapshot retains only `:free` model identifiers and verifies
+The milestone is complete. A successful OpenRouter snapshot retains only `:free` model identifiers and verifies
 that both prompt and completion prices parse to zero. Newly discovered or reappearing models are quarantined. A model is
 selectable only after a separate successful qualification, and it becomes unavailable or rejected when it disappears or
 reports non-zero pricing. Snapshots and meaningful status changes are persisted.
 
 The first live snapshot observed 21 zero-priced free-model entries. All 21 were quarantined and none was selectable.
-Tests verify discovery, qualification, disappearance, price changes, and selection exclusion. This work is committed
-separately from the still-pending command/process-mediated resource. OpenCode is not installed in the current environment,
-and the available Codex CLI is not treated as an independent free resource.
+Tests verify discovery, qualification, disappearance, price changes, and selection exclusion.
+
+The first process-mediated resource uses the installed Codex CLI and the existing project-owner account allowance. It
+does not select a particular model. Each invocation runs ephemerally in an empty temporary directory with a read-only
+sandbox, prompt input on standard input, structured JSONL output, bounded output capture, and a bounded runtime. Exit
+status, standard error, timeouts, malformed output, quota errors, authentication errors, and partial agent output are
+classified. A live invocation succeeded through the resource loop and its result was persisted.
+
+This adapter proves the non-HTTP path but is not a foundational dependency. The base OCI image does not bundle Codex or
+its authentication; process resources must be installed and supplied by a deployment that chooses to use them. OpenCode
+remains a later candidate if a genuinely independent zero-cost allowance can be configured without paid fallback.
 
 ## Milestone 4: capability evidence and task-aware selection
 
