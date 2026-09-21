@@ -55,12 +55,15 @@ project must not assume that the documented model allowlist is available.
 Initially, the OpenRouter key should be held only by the trusted resource adapter, which permits exactly the
 `openrouter/free` model identifier. Agents and experimental code must not receive the key or supply an arbitrary model
 identifier. The project key currently has an account-side spending limit of $0; a free request succeeds despite that
-limit. This is the primary provider-side spending protection and must remain $0 after funding the account. Automatic
-top-up should be disabled, a reusable payment method should be removed where possible, and the parked balance should be
-monitored. Any balance decrease is a zero-spend invariant violation and should disable the source.
+limit. This remains true after a one-time $10 credit purchase: a free-route probe reported zero cost, key usage remained
+$0, and the account balance remained $10. This is the primary provider-side spending protection. Automatic top-up is
+disabled, and the parked balance must be monitored. Any balance decrease is a zero-spend invariant violation and should
+disable the source. Account activity must also prevent the parked credits from expiring under OpenRouter's inactivity
+policy.
 
-Assessment: with a protected $10 deposit and 1,000 free requests per day, this becomes a strong initial source rather
-than merely a small bootstrap source.
+Assessment: the protected $10 deposit configuration is verified and makes OpenRouter a strong initial source rather than
+merely a small bootstrap source. OpenRouter documents 1,000 free-model requests per day after the purchase, although the
+successful probe did not expose the live daily counter in response headers.
 
 ### Cerebras Inference (currently paid)
 

@@ -25,6 +25,24 @@ Important finding: a key-level spending limit of `$0` permits zero-cost requests
 provider-side protection for parked account credit without relying on model-access guardrails. It must be rechecked after
 the account is funded with $10.
 
+Account and key state after a one-time $10 credit purchase:
+
+- The credits endpoint reported $10 total credits, $0 total usage, and a $10 balance before the probe.
+- The project key retained its `$0` spending limit and `$0` remaining spending allowance.
+- The account changed from `is_free_tier: true` to `is_free_tier: false`.
+- A request using the exact `openrouter/free` identifier returned HTTP 200 and the requested `probe-ok` answer.
+- OpenRouter selected `liquid/lfm-2.5-2.6b:free` for this probe.
+- The response reported 17 prompt tokens, 39 completion tokens, and both request cost and upstream inference cost as `$0`.
+- After the request, total usage remained $0 and the balance remained $10.
+- The successful response did not include daily rate-limit headers. The documented increase to 1,000 free-model requests
+  per day is therefore supported by OpenRouter's account policy and the observed account-tier transition, but its live
+  counter was not directly observed.
+
+The funded configuration passes the zero-spend safety check. The resource adapter must still restrict this credential to
+the exact `openrouter/free` identifier, and balance monitoring remains required. OpenRouter may expire credits after
+inactivity; its current support guidance says an inference request refreshes account activity before a scheduled
+expiration.
+
 ### Cerebras
 
 - The API key authenticates successfully.

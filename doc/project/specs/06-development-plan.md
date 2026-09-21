@@ -51,6 +51,23 @@ spending, and their important operational behavior can be observed.
 This milestone includes manual work. Automating discovery before understanding even two concrete sources would hide the
 problem behind premature abstractions.
 
+### Current status
+
+The milestone is complete. Its central hypothesis has been established more strongly than required: OpenRouter, Groq,
+and Gemini have all answered project-account requests, and Groq exposes useful quota evidence. Groq and the dedicated
+Gemini project have no paid fallback available. OpenRouter successfully serves its free route with a $10 account balance
+while its project key has a $0 spending limit; the test request reported zero cost and left the balance unchanged.
+
+OpenRouter documents an increase to 1,000 free-model requests per day after the $10 purchase, and the account changed out
+of its free-tier classification after funding. The successful test response did not expose the live daily counter, so
+the exact allowance remains policy evidence rather than a directly observed quota value. This uncertainty is recorded
+rather than blocking the resource-loop implementation.
+
+The provisional local fallback candidate is a CPU-only `llama.cpp` server running a quantized Qwen3 1.7B model. Its
+currently packaged quantized model is approximately 1.4 GB. Qwen3 4B, at approximately 2.5 GB, is the stronger comparison
+candidate if the smaller model cannot perform the recovery tasks. Selection is intentionally provisional until Milestone
+5 defines and evaluates those tasks.
+
 ## Milestone 1: minimal persistent resource loop
 
 ### Hypothesis
@@ -220,14 +237,15 @@ evidence.
 
 ### Accounts
 
-The first two project accounts should be:
+The initial project accounts are:
 
 1. OpenRouter, preferably dedicated to the project, with a protected $10 deposit to unlock the larger free-model
    allowance;
-2. Groq, providing a verified independent direct free tier with observable request and token limits.
+2. Groq, providing a verified independent direct free tier with observable request and token limits;
+3. Gemini, providing a verified independent free tier through a dedicated project without linked billing.
 
-Gemini can be added after those two have been verified. OpenCode does not require investigation for Milestone 0:
-using OpenCode with an OpenRouter account does not create a separate inference resource.
+OpenCode does not require investigation for Milestone 0: using OpenCode with an OpenRouter account does not create a
+separate inference resource.
 
 Accounts and API keys should be owned or explicitly supplied by the project owner. Account creation does not need to be
 autonomous during initial development.
@@ -256,7 +274,8 @@ arguments that may appear in shell history or process listings.
 
 During manual verification:
 
-- credential files should live outside the repository in an owner-only directory;
+- credential files may live in the repository-local `secrets/` directory because it is excluded by both `.gitignore`
+  and `.dockerignore`; a directory outside the repository would also be valid;
 - directories should use mode `0700` and files mode `0600`;
 - containers should receive individual credentials as read-only mounted secret files under `/run/secrets`;
 - the program should read one credential per file and must never log its contents;
