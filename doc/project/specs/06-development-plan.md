@@ -325,6 +325,33 @@ not yet marked complete. Real quota exhaustion is no longer an exit requirement:
 to manufacture it would contradict the resource-conservation policy, and controlled exhaustion/recovery is already
 covered by Milestone 2.
 
+## Next step: bounded resource research and qualification
+
+### Hypothesis
+
+An independent worker can use the resource service to turn a small, explicitly authorized documentation source into a
+durable candidate finding without trusting provider or model claims, spending money, or crossing a human decision
+boundary.
+
+### Initial work
+
+- Collect only exact allowlisted HTTPS pages with strict size, time, redirect, and content-type bounds.
+- Request structured analysis from the resource service by capability rather than by provider or model.
+- Persist the source snapshot, digest, selected and provider-resolved model, raw result, parsed claims, blockers, and
+  qualification state in a worker-owned database.
+- Keep every discovered candidate untrusted until deterministic qualification succeeds.
+- Restrict qualification to reviewed candidate-specific adapters; do not expose a generic endpoint or model probe.
+- Stop before account creation, credential acquisition, terms acceptance, or payment configuration.
+
+### Current status
+
+The first implementation slice is complete in code. The one-shot Compose worker has no provider credentials and consumes
+the local resource service over its private container network. Strict parsers and focused tests cover collection
+bounds, untrusted persistence, resource-service refusal, human blockers, absence of a trusted adapter, complete passing
+evidence, and adapter failure. No real candidate qualification adapter is registered yet, so provider research cannot
+silently promote a candidate into the usable pool. The design and operating contract are recorded in
+`12-resource-research-worker.md`.
+
 ## Deferred until after the early resource loop
 
 - A general autonomous coding-agent integration.

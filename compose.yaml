@@ -60,6 +60,19 @@ services:
       local-llama:
         condition: service_healthy
 
+  research-worker:
+    profiles: [tools]
+    build: .
+    command: ["node", "dist/src/research-cli.js"]
+    environment:
+      AI_CLUSTER_RESOURCE_SERVICE_URL: http://resource-service:8787
+      AI_CLUSTER_RESEARCH_URLS: ${AI_CLUSTER_RESEARCH_URLS:-}
+    volumes:
+      - ./data:/data:Z
+    depends_on:
+      resource-service:
+        condition: service_healthy
+
 volumes:
   model-cache:
     name: ai-cluster-model-cache
