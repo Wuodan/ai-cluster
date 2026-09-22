@@ -25,6 +25,7 @@ export async function invokeOpenAiCompatible(options: {
   readonly prompt: string;
   readonly requestUsage: boolean;
   readonly requireReportedZeroCost: boolean;
+  readonly timeoutMs?: number;
 }): Promise<SourceResult> {
   const response = await options.fetch(options.endpoint, {
     method: "POST",
@@ -38,6 +39,7 @@ export async function invokeOpenAiCompatible(options: {
       max_tokens: options.maxOutputTokens,
       ...(options.requestUsage ? { usage: { include: true } } : {}),
     }),
+    signal: AbortSignal.timeout(options.timeoutMs ?? 30_000),
   });
   const quota = quotaEvidence(response.headers);
   const body = await parseBody(response);
@@ -72,10 +74,10 @@ export async function invokeOpenAiCompatible(options: {
   }
 
   const output = body.json.choices?.[0]?.message?.content;
-  if (typeof output !== "string") {
+  if (typeof output !== "string" || output.trim().length === 0) {
     return {
       outcome: "malformed_response",
-      errorMessage: "Provider response did not contain text output",
+      errorMessage: "Provider response did not contain non-empty text output",
       ...(resolvedModel === undefined ? {} : { resolvedModel }),
       ...(quota === undefined ? {} : { quota }),
     };

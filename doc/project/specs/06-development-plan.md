@@ -301,6 +301,24 @@ The resource loop is reliable enough to supply an independent future work loop.
 Reaching this milestone means the resource layer is usable in an early form. It does not mean the larger project is
 complete.
 
+### Current status
+
+Implementation is in progress. A loopback-bound HTTP service now accepts provider-independent inference requirements and
+returns request IDs, selected and provider-resolved model identities, access path, resource state, and capability
+evidence. It exposes configured-pool status, bounded history, explicit refusal results, and an application-selection
+zero-spend audit whose provider-balance limitation is stated rather than hidden.
+
+Background catalog refresh, capability evaluation, and availability probing run through one non-overlapping queue with
+configurable lower-bounded intervals. Available resources are not probed merely to consume capacity. Disabled and
+still-cooling resources are skipped, calls have time bounds, and each maintenance run is durable.
+
+The live Compose service has survived one intentional container restart with its SQLite history intact. During its first
+cycles, OpenRouter returned a malformed empty result through one routed free model, entered degraded cooldown, and later
+recovered through a different routed free model. Groq served a requirement-selected structured JSON request, the local
+fallback was observed, an unsupported coding request was refused without an inference call, and the audit found no
+selection outside the zero-cost allowlist. The sustained run required by this milestone is ongoing, so the milestone is
+not yet marked complete.
+
 ## Deferred until after the early resource loop
 
 - A general autonomous coding-agent integration.

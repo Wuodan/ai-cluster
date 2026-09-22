@@ -72,3 +72,13 @@ test("local llama uses its fixed model without a credential", async () => {
   assert.equal(result.outcome, "success");
   assert.equal(result.resolvedModel, "loaded-local-model");
 });
+
+test("an empty provider answer is malformed rather than successful", async () => {
+  const source = new GroqSource("secret", async () => Response.json({
+    choices: [{ message: { content: "" } }],
+  }));
+
+  const result = await source.invoke({ prompt: "hello", maxOutputTokens: 10 });
+
+  assert.equal(result.outcome, "malformed_response");
+});

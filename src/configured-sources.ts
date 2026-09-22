@@ -17,8 +17,8 @@ export function createConfiguredSources(options: {
   readonly localEndpoint?: string;
 }): readonly InferenceSource[] {
   return options.names.map((name): InferenceSource => {
-    if (name === "openrouter") return new OpenRouterSource(readSecret(options.secretsDirectory, "openrouter_api_key"));
-    if (name === "groq") return new GroqSource(readSecret(options.secretsDirectory, "groq_api_key"));
+    if (name === "openrouter") return new OpenRouterSource(readSecretFile(options.secretsDirectory, "openrouter_api_key"));
+    if (name === "groq") return new GroqSource(readSecretFile(options.secretsDirectory, "groq_api_key"));
     if (name === "codex") return new CodexCliSource();
     if (name === "local") {
       return new LocalLlamaSource(options.localEndpoint ?? "http://127.0.0.1:8080/v1/chat/completions");
@@ -27,7 +27,7 @@ export function createConfiguredSources(options: {
   });
 }
 
-function readSecret(directory: string, name: string): string {
+export function readSecretFile(directory: string, name: string): string {
   const value = readFileSync(join(directory, name), "utf8").trim();
   if (value.length === 0) throw new Error(`Secret file is empty: ${name}`);
   return value;

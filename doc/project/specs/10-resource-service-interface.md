@@ -28,4 +28,19 @@ cannot independently prove a provider account balance; that requires provider-si
 ## Current milestone boundary
 
 The HTTP contract, persisted resolved-model identity, status, history, audit, and refusal behavior are implemented.
-Bounded background maintenance and the sustained live run remain before Milestone 6 is complete.
+
+Background maintenance uses a single queue, so maintenance calls never overlap. Its defaults are:
+
+- probe unknown or retry-eligible resources every 15 minutes, while skipping available, disabled, and still-cooling
+  resources;
+- refresh the OpenRouter free catalog every 6 hours;
+- re-run the deterministic capability suite every 24 hours, skipping disabled and still-cooling resources.
+
+Intervals can be changed with `AI_CLUSTER_PROBE_INTERVAL_MS`, `AI_CLUSTER_CATALOG_INTERVAL_MS`, and
+`AI_CLUSTER_EVALUATION_INTERVAL_MS`; values below one second are rejected. Every run records kind, target, outcome,
+summary, and start/finish time. Provider HTTP calls are bounded to 30 seconds. All inference maintenance paths apply the
+same zero-cost allowlist as client requests.
+
+The live Compose service is now running against its persistent volume. Its first cycles recorded three resources, a
+successful free-catalog snapshot, provider-resolved models, and a real OpenRouter transition from malformed response to
+degraded, cooldown elapsed, and available. A sustained live run still remains before Milestone 6 is complete.

@@ -66,6 +66,19 @@ export interface StoredRecoveryFinding extends RecoveryFindingRecord {
   readonly id: string;
 }
 
+export interface MaintenanceRunRecord {
+  readonly kind: "catalog_refresh" | "capability_evaluation" | "availability_probe";
+  readonly target: string;
+  readonly outcome: "success" | "failed" | "skipped";
+  readonly summary: string;
+  readonly startedAtMs: number;
+  readonly finishedAtMs: number;
+}
+
+export interface StoredMaintenanceRun extends MaintenanceRunRecord {
+  readonly id: string;
+}
+
 export class ResourceStore {
   readonly #database: DatabaseSync;
 
@@ -457,6 +470,32 @@ export class ResourceStore {
     }));
   }
 
+  async recordMaintenanceRun(run: MaintenanceRunRecord): Promise<string> {
+    const id = randomUUID();
+    this.#database.prepare(`
+      INSERT INTO maintenance_runs (
+        id, kind, target, outcome, summary, started_at_ms, finished_at_ms
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, run.kind, run.target, run.outcome, run.summary, run.startedAtMs, run.finishedAtMs);
+    return id;
+  }
+
+  async listRecentMaintenanceRuns(limit: number): Promise<readonly StoredMaintenanceRun[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000) throw new Error("Invalid maintenance limit");
+    const rows = this.#database.prepare(`
+      SELECT * FROM maintenance_runs ORDER BY started_at_ms DESC, id DESC LIMIT ?
+    `).all(limit) as Record<string, unknown>[];
+    return rows.map((row) => ({
+      id: row.id as string,
+      kind: row.kind as MaintenanceRunRecord["kind"],
+      target: row.target as string,
+      outcome: row.outcome as MaintenanceRunRecord["outcome"],
+      summary: row.summary as string,
+      startedAtMs: row.started_at_ms as number,
+      finishedAtMs: row.finished_at_ms as number,
+    }));
+  }
+
   #migrate(): void {
     this.#database.exec(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -587,6 +626,19 @@ export class ResourceStore {
       CREATE INDEX IF NOT EXISTS recovery_findings_time
         ON recovery_findings (observed_at_ms);
 
+      CREATE TABLE IF NOT EXISTS maintenance_runs (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL CHECK (kind IN ('catalog_refresh', 'capability_evaluation', 'availability_probe')),
+        target TEXT NOT NULL,
+        outcome TEXT NOT NULL CHECK (outcome IN ('success', 'failed', 'skipped')),
+        summary TEXT NOT NULL,
+        started_at_ms INTEGER NOT NULL,
+        finished_at_ms INTEGER NOT NULL CHECK (finished_at_ms >= started_at_ms)
+      ) STRICT;
+
+      CREATE INDEX IF NOT EXISTS maintenance_runs_time
+        ON maintenance_runs (started_at_ms DESC);
+
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (1);
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (2);
       INSERT OR IGNORE INTO schema_migrations (version) VALUES (3);
@@ -598,6 +650,7 @@ export class ResourceStore {
       this.#database.exec("ALTER TABLE attempts ADD COLUMN resolved_model TEXT");
     }
     this.#database.prepare("INSERT OR IGNORE INTO schema_migrations (version) VALUES (6)").run();
+    this.#database.prepare("INSERT OR IGNORE INTO schema_migrations (version) VALUES (7)").run();
   }
 
   #toStoredAttempt(row: Record<string, unknown>): StoredAttempt {

@@ -22,6 +22,7 @@ export class OpenRouterCatalog {
   async refresh(store: ResourceStore, observedAtMs = Date.now()): Promise<number> {
     const response = await this.#fetch("https://openrouter.ai/api/v1/models", {
       headers: { authorization: `Bearer ${this.#apiKey}` },
+      signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) throw new Error(`OpenRouter catalog request failed with HTTP ${response.status}`);
 

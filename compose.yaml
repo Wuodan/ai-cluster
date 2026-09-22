@@ -14,6 +14,12 @@ services:
       - "1"
     volumes:
       - model-cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 60
+      start_period: 5s
 
   resource-manager:
     profiles: [tools]
@@ -25,7 +31,8 @@ services:
     volumes:
       - resource-data:/data
     depends_on:
-      - local-llama
+      local-llama:
+        condition: service_healthy
 
   resource-service:
     build: .
@@ -41,7 +48,8 @@ services:
       - ./secrets/openrouter_api_key:/run/secrets/openrouter_api_key:ro
       - ./secrets/groq_api_key:/run/secrets/groq_api_key:ro
     depends_on:
-      - local-llama
+      local-llama:
+        condition: service_healthy
 
 volumes:
   model-cache:
