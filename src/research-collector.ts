@@ -35,12 +35,12 @@ export class AllowlistedResearchCollector {
     const response = await this.#fetch(url, {
       redirect: "manual",
       signal: AbortSignal.timeout(this.#timeoutMs),
-      headers: { accept: "text/html, text/plain, application/json" },
+      headers: { accept: "text/markdown, text/html, text/plain, application/json" },
     });
     if (response.status >= 300 && response.status < 400) throw new Error("Research document redirects are not followed");
     if (!response.ok) throw new Error(`Research document returned HTTP ${response.status}`);
     const contentType = (response.headers.get("content-type") ?? "").split(";", 1)[0]?.trim().toLowerCase() ?? "";
-    if (!new Set(["text/html", "text/plain", "application/json"]).has(contentType)) {
+    if (!new Set(["text/markdown", "text/html", "text/plain", "application/json"]).has(contentType)) {
       throw new Error(`Research document has unsupported content type: ${contentType || "missing"}`);
     }
     const content = await readBoundedText(response, this.#maximumBytes);

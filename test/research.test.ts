@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import type { CollectedDocument } from "../src/research-collector.js";
 import {
+  deterministicQualificationSteps,
   decideQualification,
   parseResearchProposal,
   runResearchTask,
@@ -17,7 +18,7 @@ const candidate: ResearchCandidate = {
   accessPath: "https://api.example.test/v1",
   claims: [{ kind: "zero_cost", statement: "A free tier is advertised.", evidence: "Pricing table: Free" }],
   manualBlockers: [],
-  qualificationSteps: ["Check exact model pricing", "Verify paid fallback is blocked"],
+  qualificationSteps: deterministicQualificationSteps,
 };
 
 const candidateProposal = {
@@ -26,14 +27,26 @@ const candidateProposal = {
   candidates: [candidate],
 } as const;
 
+const modelCandidateProposal = {
+  ...candidateProposal,
+  candidates: [{
+    provider: candidate.provider,
+    accessPath: candidate.accessPath,
+    claims: candidate.claims,
+    manualBlockers: candidate.manualBlockers,
+  }],
+} as const;
+
 test("strictly parses bounded research proposals", () => {
-  assert.deepEqual(parseResearchProposal(JSON.stringify(candidateProposal), "Example AI"), candidateProposal);
-  assert.equal(parseResearchProposal(JSON.stringify({ ...candidateProposal, trusted: true }), "Example AI"), undefined);
-  assert.equal(parseResearchProposal(JSON.stringify(candidateProposal), "Different AI"), undefined);
+  assert.deepEqual(parseResearchProposal(JSON.stringify(modelCandidateProposal), "Example AI"), candidateProposal);
+  assert.equal(parseResearchProposal(JSON.stringify({ ...modelCandidateProposal, trusted: true }), "Example AI"), undefined);
+  assert.equal(parseResearchProposal(JSON.stringify(modelCandidateProposal), "Different AI"), undefined);
+  assert.equal(parseResearchProposal(JSON.stringify(candidateProposal), "Example AI"), undefined);
   assert.equal(parseResearchProposal(JSON.stringify({
-    ...candidateProposal,
-    candidates: [{ ...candidate, manualBlockers: ["credentials"] }],
+    ...modelCandidateProposal,
+    candidates: [{ ...modelCandidateProposal.candidates[0], manualBlockers: ["credentials"] }],
   }), "Example AI"), undefined);
+  assert.deepEqual(candidate.qualificationSteps, deterministicQualificationSteps);
 });
 
 test("persists research claims as untrusted and refuses generic qualification", async () => {
@@ -42,7 +55,7 @@ test("persists research claims as untrusted and refuses generic qualification", 
     const result = await runResearchTask({
       task: { provider: "Example AI", url: "https://docs.example.test/free" },
       collector: new StubCollector(),
-      inferenceClient: new StubInferenceClient(JSON.stringify(candidateProposal)),
+      inferenceClient: new StubInferenceClient(JSON.stringify(modelCandidateProposal)),
       store,
       now: increasingClock(),
     });
@@ -73,7 +86,7 @@ test("stops at a human blocker without invoking a qualification adapter", async 
   const blocked = {
     status: "manual_action_required",
     summary: "An account and payment setup are required.",
-    candidates: [{ ...candidate, manualBlockers: ["account_creation", "payment_configuration"] }],
+    candidates: [{ ...modelCandidateProposal.candidates[0], manualBlockers: ["account_creation", "payment_configuration"] }],
   } as const;
   try {
     await runResearchTask({
@@ -98,14 +111,17 @@ test("only code-trusted deterministic evidence can qualify a candidate", async (
     qualify: async () => [
       { check: "zero_cost", verdict: "pass", evidence: "Exact model price was deterministically zero." },
       { check: "paid_fallback_blocked", verdict: "pass", evidence: "The test account has no billing path." },
+      { check: "account_protection", verdict: "pass", evidence: "The account cannot enter a paid tier." },
       { check: "access_works", verdict: "pass", evidence: "A bounded probe succeeded." },
+      { check: "allowance_behavior", verdict: "pass", evidence: "Controlled evidence shows requests stop at the limit." },
+      { check: "balance_unchanged", verdict: "pass", evidence: "The account has no billable balance." },
     ],
   };
   try {
     await runResearchTask({
       task: { provider: "Example AI", url: "https://docs.example.test/free" },
       collector: new StubCollector(),
-      inferenceClient: new StubInferenceClient(JSON.stringify(candidateProposal)),
+      inferenceClient: new StubInferenceClient(JSON.stringify(modelCandidateProposal)),
       qualificationAdapters: [adapter],
       store,
     });
@@ -129,13 +145,37 @@ test("persists a trusted qualification adapter failure as incomplete", async () 
     await runResearchTask({
       task: { provider: "Example AI", url: "https://docs.example.test/free" },
       collector: new StubCollector(),
-      inferenceClient: new StubInferenceClient(JSON.stringify(candidateProposal)),
+      inferenceClient: new StubInferenceClient(JSON.stringify(modelCandidateProposal)),
       qualificationAdapters: [adapter],
       store,
     });
     assert.deepEqual((await store.listQualifications()).map(({ status, reason }) => ({ status, reason })), [{
       status: "incomplete",
       reason: "qualification_adapter_failed:bounded probe failed",
+    }]);
+  } finally {
+    store.close();
+  }
+});
+
+test("persists a qualification adapter matching failure as incomplete", async () => {
+  const store = new ResearchStore(":memory:");
+  const adapter: QualificationAdapter = {
+    id: "broken-matcher",
+    supports: () => { throw new Error("invalid adapter configuration"); },
+    qualify: async () => [],
+  };
+  try {
+    await runResearchTask({
+      task: { provider: "Example AI", url: "https://docs.example.test/free" },
+      collector: new StubCollector(),
+      inferenceClient: new StubInferenceClient(JSON.stringify(modelCandidateProposal)),
+      qualificationAdapters: [adapter],
+      store,
+    });
+    assert.deepEqual((await store.listQualifications()).map(({ status, reason }) => ({ status, reason })), [{
+      status: "incomplete",
+      reason: "qualification_adapter_match_failed:invalid adapter configuration",
     }]);
   } finally {
     store.close();
@@ -149,7 +189,10 @@ test("qualification fails closed on failed, unknown, duplicate, or missing check
   assert.equal(decideQualification([
     { check: "zero_cost", verdict: "pass", evidence: "zero" },
     { check: "paid_fallback_blocked", verdict: "unknown", evidence: "not visible" },
+    { check: "account_protection", verdict: "pass", evidence: "protected" },
     { check: "access_works", verdict: "pass", evidence: "probe" },
+    { check: "allowance_behavior", verdict: "pass", evidence: "controlled" },
+    { check: "balance_unchanged", verdict: "pass", evidence: "no balance" },
   ]).status, "incomplete");
   assert.equal(decideQualification([
     { check: "zero_cost", verdict: "pass", evidence: "zero" },

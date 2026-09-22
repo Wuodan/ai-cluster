@@ -352,6 +352,13 @@ evidence, and adapter failure. No real candidate qualification adapter is regist
 silently promote a candidate into the usable pool. The design and operating contract are recorded in
 `12-resource-research-worker.md`.
 
+The worker has also completed a live containerized research run against an exact allowlisted Cloudflare Workers AI
+pricing document. It persisted one untrusted candidate and stopped at account, credential, and terms decisions. No
+candidate endpoint or paid path was called. Earlier rejected and accepted outputs demonstrated that prompt prohibitions
+were insufficient to make model-authored qualification instructions safe, so the model schema now excludes those
+instructions and the worker attaches a deterministic checklist. The resource-service audit remained clean and the soak
+continued without restart.
+
 ## Deferred until after the early resource loop
 
 - A general autonomous coding-agent integration.

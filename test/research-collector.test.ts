@@ -46,3 +46,15 @@ test("collector rejects redirects, unsupported content, and oversized bodies", a
   });
   await assert.rejects(oversized.collect("https://docs.example.test/free"), /exceeds 1024 bytes/);
 });
+
+test("collector accepts compact provider Markdown documentation", async () => {
+  const collector = new AllowlistedResearchCollector({
+    allowedUrls: ["https://docs.example.test/pricing/index.md"],
+    fetchImplementation: (async () => new Response("# Pricing\n\nFree allocation: unverified claim.", {
+      headers: { "content-type": "text/markdown; charset=utf-8" },
+    })) as typeof fetch,
+  });
+
+  const document = await collector.collect("https://docs.example.test/pricing/index.md");
+  assert.equal(document.contentType, "text/markdown");
+});
