@@ -559,7 +559,7 @@ export class ResourceStore {
         sequence INTEGER NOT NULL CHECK (sequence > 0),
         source_id TEXT NOT NULL,
         model TEXT NOT NULL,
-        access_path TEXT NOT NULL CHECK (access_path IN ('api', 'process', 'local')),
+        access_path TEXT NOT NULL CHECK (access_path IN ('api', 'local')),
         capability TEXT NOT NULL CHECK (capability IN (
           'text_generation', 'instruction_following', 'structured_json',
           'tool_use', 'coding', 'context_tokens'

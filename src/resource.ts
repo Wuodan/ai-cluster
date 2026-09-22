@@ -52,7 +52,7 @@ export interface SourceResult {
 export interface InferenceSource {
   readonly id: string;
   readonly model: string;
-  readonly accessPath: "api" | "process" | "local";
+  readonly accessPath: "api" | "local";
   invoke(request: InferenceRequest): Promise<SourceResult>;
 }
 

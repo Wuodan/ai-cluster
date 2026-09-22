@@ -42,13 +42,12 @@ A resource does not need to expose a conventional LLM API. Access may be availab
 
 - a provider API;
 - an aggregator or router;
-- a command-line coding agent or another user-facing tool;
 - a temporary or promotional service;
 - a small local model;
 - another access mechanism discovered later.
 
-The software may therefore need to operate existing tools rather than merely normalize HTTP APIs. It shall not depend
-on a single provider, model, interface, or coding agent.
+Coding agents are consumers of the resource layer rather than inference resources themselves. The resource loop shall
+not depend on a single provider, model, or interface.
 
 ## Two cooperating loops
 

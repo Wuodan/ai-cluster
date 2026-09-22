@@ -145,27 +145,22 @@ reset duration, remaining token capacity increased despite the second request co
 the real daily request allocation was unnecessary; exhaustion and recovery behavior is exercised with controlled fake
 sources without wasting external capacity.
 
-## Milestone 3: changing catalogs and tool-mediated access
+## Milestone 3: changing catalogs
 
 ### Hypothesis
 
-The resource loop can handle more than a fixed list of OpenAI-compatible endpoints.
+The resource loop can safely observe and react to a changing provider model catalog.
 
 ### Work
 
 - Read and compare a provider's live model catalog with previously observed models.
 - Detect a free model appearing, disappearing, or changing price/status.
 - Quarantine newly discovered models until their zero-cost status and minimal behavior have been checked.
-- Add one command/process-mediated resource, with OpenCode as the initial candidate.
-- Capture process exit, structured output where available, rate-limit messages, authentication failure, and partial work.
-- Keep the coding agent's execution semantics outside the generic resource observation core.
 
 ### Exit criteria
 
 - Catalog changes become persisted observations rather than requiring a source-code edit.
 - A newly absent or non-free model is not selected.
-- The system can obtain and classify a result from one non-HTTP or agent-mediated access path.
-- Failure of that process does not corrupt the resource loop.
 
 ### Current status
 
@@ -177,15 +172,9 @@ reports non-zero pricing. Snapshots and meaningful status changes are persisted.
 The first live snapshot observed 21 zero-priced free-model entries. All 21 were quarantined and none was selectable.
 Tests verify discovery, qualification, disappearance, price changes, and selection exclusion.
 
-The first process-mediated resource uses the installed Codex CLI and the existing project-owner account allowance. It
-does not select a particular model. Each invocation runs ephemerally in an empty temporary directory with a read-only
-sandbox, prompt input on standard input, structured JSONL output, bounded output capture, and a bounded runtime. Exit
-status, standard error, timeouts, malformed output, quota errors, authentication errors, and partial agent output are
-classified. A live invocation succeeded through the resource loop and its result was persisted.
-
-This adapter proves the non-HTTP path but is not a foundational dependency. The base OCI image does not bundle Codex or
-its authentication; process resources must be installed and supplied by a deployment that chooses to use them. OpenCode
-remains a later candidate if a genuinely independent zero-cost allowance can be configured without paid fallback.
+An earlier experiment treated the installed Codex CLI and the owner's paid account allowance as a resource. That adapter
+was removed after scope review: personal paid coding-agent capacity is not part of the zero-cost resource pool. Future
+coding-agent integration belongs in the work layer, where an agent consumes models supplied by this resource layer.
 
 ## Milestone 4: capability evidence and task-aware selection
 

@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { InferenceSource } from "./resource.js";
-import { CodexCliSource } from "./sources/codex-cli.js";
 import { GroqSource } from "./sources/groq.js";
 import { LocalLlamaSource } from "./sources/local-llama.js";
 import { OpenRouterSource } from "./sources/openrouter.js";
@@ -19,7 +18,6 @@ export function createConfiguredSources(options: {
   return options.names.map((name): InferenceSource => {
     if (name === "openrouter") return new OpenRouterSource(readSecretFile(options.secretsDirectory, "openrouter_api_key"));
     if (name === "groq") return new GroqSource(readSecretFile(options.secretsDirectory, "groq_api_key"));
-    if (name === "codex") return new CodexCliSource();
     if (name === "local") {
       return new LocalLlamaSource(options.localEndpoint ?? "http://127.0.0.1:8080/v1/chat/completions");
     }
