@@ -53,6 +53,9 @@ Each completed or skipped maintenance run is also written as a structured `event
 output. An initial `maintenance_configured` line shows the active intervals, so quiet logs mean that no task is due—not
 that the scheduler is missing.
 
-The live Compose service is now running against its persistent volume. Its first cycles recorded three resources, a
-successful free-catalog snapshot, provider-resolved models, and a real OpenRouter transition from malformed response to
-degraded, cooldown elapsed, and available. A sustained live run still remains before Milestone 6 is complete.
+The live Compose service is now running against its persistent volume. Its first cycles recorded OpenRouter, Groq, and
+the local fallback, a successful free-catalog snapshot, provider-resolved models, and a real OpenRouter transition from
+malformed response to degraded, cooldown elapsed, and available. Gemini 3.6 Flash was subsequently added as the third
+external source through the already verified dedicated project. It passed a minimal live adapter request and is now part
+of the configured zero-cost pool. A sustained live run including the expanded pool still remains before Milestone 6 is
+complete.

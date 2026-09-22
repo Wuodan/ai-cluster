@@ -298,16 +298,19 @@ The live Compose service has survived intentional container restarts with its SQ
 cycles, OpenRouter returned a malformed empty result through one routed free model, entered degraded cooldown, and later
 recovered through a different routed free model. Groq served a requirement-selected structured JSON request, the local
 fallback was observed, an unsupported coding request was refused without an inference call, and the audit found no
-selection outside the zero-cost allowlist. The sustained run required by this milestone is ongoing, so the milestone is
-not yet marked complete. Real quota exhaustion is no longer an exit requirement: deliberately consuming free capacity
-to manufacture it would contradict the resource-conservation policy, and controlled exhaustion/recovery is already
-covered by Milestone 2.
+selection outside the zero-cost allowlist. Gemini 3.6 Flash is now configured as the third external source through its
+dedicated unbilled project. Its fixed-model adapter passed a live minimal request; it uses minimal thinking for the
+resource service's bounded calls and treats token-truncated output as malformed rather than successful. The sustained
+run required by this milestone is ongoing, so the milestone is not yet marked complete. Real quota exhaustion is no
+longer an exit requirement: deliberately consuming free capacity to manufacture it would contradict the
+resource-conservation policy, and controlled exhaustion/recovery is already covered by Milestone 2.
 
 ## Direction after the early resource loop
 
 Development should use and improve the resources already supplied by the owner before attempting to acquire more
-provider accounts. The next useful work is to integrate the already verified Gemini account, improve model selection and
-evaluation within the configured OpenRouter, Groq, and Gemini access paths, and use that capacity for core project work.
+provider accounts. The verified Gemini account is now integrated. The next useful resource work is to improve model
+selection and evaluation within the configured OpenRouter, Groq, and Gemini access paths and use that capacity for core
+project work.
 
 Researching or registering additional provider accounts should be reconsidered only if durable observations show that
 the configured pool regularly prevents useful work through exhaustion, unavailability, or missing capabilities. It is
@@ -322,8 +325,8 @@ service. Recording this design does not move its implementation into Milestone 6
 
 The agreed sequence from the current state is:
 
-1. Integrate the already verified Gemini project as the third external source, with the same fixed-resource allowlist,
-   persisted evidence, and zero-spend enforcement used by the existing sources.
+1. **Complete:** integrate the already verified Gemini project as the third external source, with the same fixed-resource
+   allowlist, persisted evidence, and zero-spend enforcement used by the existing sources.
 2. Complete Milestone 6 after the sustained soak has crossed a normal daily maintenance cycle, the local HTTP interface
    has been verified from the host, and its persisted history still explains maintenance, failures, and recovery. The
    soak should continue while other work proceeds; elapsed-time evidence must not be simulated.

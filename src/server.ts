@@ -13,7 +13,7 @@ import { ResourceService } from "./service.js";
 import { ResourceStore } from "./store.js";
 
 const store = new ResourceStore(process.env.AI_CLUSTER_DATABASE_PATH ?? "/data/resource-loop.sqlite");
-const sourceNames = parseSourceNames(process.env.AI_CLUSTER_SOURCES ?? "openrouter,groq,local");
+const sourceNames = parseSourceNames(process.env.AI_CLUSTER_SOURCES ?? "openrouter,groq,gemini,local");
 const secretsDirectory = process.env.AI_CLUSTER_SECRETS_DIR ?? "/run/secrets";
 const sources = createConfiguredSources({
   names: sourceNames,

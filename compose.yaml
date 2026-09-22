@@ -30,7 +30,7 @@ services:
     environment:
       AI_CLUSTER_HOST: 0.0.0.0
       AI_CLUSTER_LOCAL_ENDPOINT: http://local-llama:8080/v1/chat/completions
-      AI_CLUSTER_SOURCES: openrouter,groq,local
+      AI_CLUSTER_SOURCES: openrouter,groq,gemini,local
     ports:
       - "127.0.0.1:8787:8787"
     healthcheck:
@@ -43,6 +43,7 @@ services:
       - ./data:/data:Z
       - ./secrets/openrouter_api_key:/run/secrets/openrouter_api_key:ro
       - ./secrets/groq_api_key:/run/secrets/groq_api_key:ro
+      - ./secrets/gemini_api_key:/run/secrets/gemini_api_key:ro
     depends_on:
       local-llama:
         condition: service_healthy

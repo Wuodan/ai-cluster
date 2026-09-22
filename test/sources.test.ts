@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { GeminiSource } from "../src/sources/gemini.js";
 import { GroqSource } from "../src/sources/groq.js";
 import { LocalLlamaSource } from "../src/sources/local-llama.js";
 import { OpenRouterSource } from "../src/sources/openrouter.js";
@@ -53,6 +54,63 @@ test("rate limiting is classified as exhaustion", async () => {
 
   assert.equal(result.outcome, "exhausted");
   assert.equal(result.errorCode, "rate_limit_exceeded");
+  assert.equal(result.quota?.raw?.["retry-after"], "60");
+});
+
+test("Gemini fixes the model and keeps its credential out of the URL", async () => {
+  let sentUrl = "";
+  let sentHeaders = new Headers();
+  let sentBody: unknown;
+  const source = new GeminiSource("secret", async (input, init) => {
+    sentUrl = String(input);
+    sentHeaders = new Headers(init?.headers);
+    sentBody = JSON.parse(String(init?.body));
+    return Response.json({
+      modelVersion: "gemini-3.6-flash-001",
+      candidates: [{ content: { parts: [{ text: "ok" }] }, finishReason: "STOP" }],
+    });
+  });
+
+  const result = await source.invoke({ prompt: "hello", maxOutputTokens: 10 });
+
+  assert.equal(sentUrl, "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent");
+  assert.equal(sentUrl.includes("secret"), false);
+  assert.equal(sentHeaders.get("x-goog-api-key"), "secret");
+  assert.deepEqual(sentBody, {
+    contents: [{ role: "user", parts: [{ text: "hello" }] }],
+    generationConfig: {
+      maxOutputTokens: 10,
+      thinkingConfig: { thinkingLevel: "minimal" },
+    },
+  });
+  assert.equal(result.outcome, "success");
+  assert.equal(result.output, "ok");
+  assert.equal(result.resolvedModel, "gemini-3.6-flash-001");
+});
+
+test("Gemini treats a token-truncated answer as malformed", async () => {
+  const source = new GeminiSource("secret", async () => Response.json({
+    modelVersion: "gemini-3.6-flash",
+    candidates: [{ content: { parts: [{ text: "partial" }] }, finishReason: "MAX_TOKENS" }],
+  }));
+
+  const result = await source.invoke({ prompt: "hello", maxOutputTokens: 10 });
+
+  assert.equal(result.outcome, "malformed_response");
+  assert.match(result.errorMessage ?? "", /maxOutputTokens/);
+});
+
+test("Gemini rate limiting is classified as exhaustion", async () => {
+  const source = new GeminiSource("secret", async () => Response.json(
+    { error: { code: 429, status: "RESOURCE_EXHAUSTED", message: "quota reached" } },
+    { status: 429, headers: { "retry-after": "60" } },
+  ));
+
+  const result = await source.invoke({ prompt: "hello", maxOutputTokens: 10 });
+
+  assert.equal(result.outcome, "exhausted");
+  assert.equal(result.errorCode, "RESOURCE_EXHAUSTED");
+  assert.equal(result.errorMessage, "quota reached");
   assert.equal(result.quota?.raw?.["retry-after"], "60");
 });
 
