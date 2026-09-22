@@ -25,6 +25,13 @@ The service is already running if both rows below report `healthy`:
 docker compose ps
 ```
 
+Development state is stored under the ignored repository-local `data/` directory. A production-style deployment uses a
+named data volume instead:
+
+```sh
+docker compose -f compose.yaml -f compose.production.yaml up -d --build resource-service
+```
+
 ## Monitor
 
 Follow operational logs until interrupted with Ctrl-C; this does not stop the containers:
@@ -56,7 +63,19 @@ curl -sS http://127.0.0.1:8787/v1/audit | jq .
 
 The 15-minute availability job records a durable maintenance row even when every available resource is correctly
 skipped. Those rows act as low-cost heartbeats. Catalog refreshes occur every 6 hours and capability evaluations every
-24 hours. Recent work is not repeated after a restart.
+24 hours. Recent work is not repeated after a restart. Each run emits a structured `maintenance` log event; startup also
+emits `maintenance_configured` with the active intervals. It is therefore normal for the log to remain quiet between
+scheduled events.
+
+The database can also be inspected directly during development:
+
+```sh
+ls -lh data/
+sqlite3 -header -column data/resource-loop.sqlite \
+  "select kind, target, outcome, summary, datetime(started_at_ms / 1000, 'unixepoch', 'localtime') as started from maintenance_runs order by started_at_ms desc limit 20;"
+```
+
+Read it while the service is running if desired, but do not edit it behind the service's back.
 
 ## Restart and persistence check
 
@@ -77,13 +96,14 @@ The history should still contain entries from before the restart. Both long-runn
 docker compose stop
 ```
 
-Starting again with `docker compose up -d resource-service` reuses the database and model cache. Do not use
-`docker compose down -v` unless the explicit intention is to delete both named volumes, including soak history.
+Starting again with `docker compose up -d resource-service` reuses `data/resource-loop.sqlite` and the model cache. Do
+not delete the `data/` directory. In the production-style Compose configuration, avoid `docker compose down -v` unless
+the explicit intention is to delete its named data volume.
 
 ## Hand-off for continued development
 
 Leave the service running and return to the project later with a request to continue. The next inspection can read the
-same API and named SQLite volume. Useful evidence includes:
+same API and SQLite database. Useful evidence includes:
 
 - different provider-resolved models for the same free route;
 - catalog additions, removals, or price/status changes;

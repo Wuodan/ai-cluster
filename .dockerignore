@@ -1,5 +1,6 @@
 # directory holding secrets (API keys)
 /secrets
+/data
 # node build output and dependency directories
 /dist
 /node_modules

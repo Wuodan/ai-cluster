@@ -71,8 +71,8 @@ printf '%s\n' 'All external sources are unavailable. No alternative path was fou
   | docker compose --profile tools run --rm -T resource-manager
 ```
 
-The SQLite database is retained in the Compose `resource-data` volume. The model cache is retained separately in
-`model-cache`.
+During development, the SQLite database is retained in the ignored repository-local `data/` directory so it can be
+inspected directly. The model cache is retained separately in the `model-cache` Docker volume.
 
 ## Remaining boundary
 

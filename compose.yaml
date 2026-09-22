@@ -30,7 +30,7 @@ services:
       AI_CLUSTER_LOCAL_ENDPOINT: http://local-llama:8080/v1/chat/completions
       AI_CLUSTER_SOURCES: local
     volumes:
-      - resource-data:/data
+      - ./data:/data:Z
     depends_on:
       local-llama:
         condition: service_healthy
@@ -53,7 +53,7 @@ services:
       retries: 3
       start_period: 5s
     volumes:
-      - resource-data:/data
+      - ./data:/data:Z
       - ./secrets/openrouter_api_key:/run/secrets/openrouter_api_key:ro
       - ./secrets/groq_api_key:/run/secrets/groq_api_key:ro
     depends_on:
@@ -63,5 +63,3 @@ services:
 volumes:
   model-cache:
     name: ai-cluster-model-cache
-  resource-data:
-    name: ai-cluster-resource-data

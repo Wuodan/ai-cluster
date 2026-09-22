@@ -15,28 +15,31 @@ export async function runMaintenanceTask(
   task: MaintenanceTask,
   store: ResourceStore,
   now: () => number = Date.now,
-): Promise<void> {
+): Promise<MaintenanceRunRecord> {
   const startedAtMs = now();
+  let run: MaintenanceRunRecord;
   try {
     const result = await task.execute();
-    await store.recordMaintenanceRun({
+    run = {
       kind: task.kind,
       target: task.target,
       outcome: result.outcome,
       summary: result.summary,
       startedAtMs,
       finishedAtMs: now(),
-    });
+    };
   } catch (error: unknown) {
-    await store.recordMaintenanceRun({
+    run = {
       kind: task.kind,
       target: task.target,
       outcome: "failed",
       summary: error instanceof Error ? error.message : String(error),
       startedAtMs,
       finishedAtMs: now(),
-    });
+    };
   }
+  await store.recordMaintenanceRun(run);
+  return run;
 }
 
 export class MaintenanceScheduler {
@@ -44,10 +47,16 @@ export class MaintenanceScheduler {
   readonly #tasks: readonly MaintenanceTask[];
   readonly #timers = new Set<NodeJS.Timeout>();
   readonly #now: () => number;
+  readonly #onRun: ((run: MaintenanceRunRecord) => void) | undefined;
   #queue: Promise<void> = Promise.resolve();
   #stopped = true;
 
-  constructor(tasks: readonly MaintenanceTask[], store: ResourceStore, now: () => number = Date.now) {
+  constructor(
+    tasks: readonly MaintenanceTask[],
+    store: ResourceStore,
+    now: () => number = Date.now,
+    onRun?: (run: MaintenanceRunRecord) => void,
+  ) {
     for (const task of tasks) {
       if (!Number.isSafeInteger(task.intervalMs) || task.intervalMs < 1_000) {
         throw new Error(`Invalid maintenance interval for ${task.kind}`);
@@ -56,6 +65,7 @@ export class MaintenanceScheduler {
     this.#tasks = tasks;
     this.#store = store;
     this.#now = now;
+    this.#onRun = onRun;
   }
 
   async start(runWhenNeverObserved = true): Promise<void> {
@@ -81,7 +91,10 @@ export class MaintenanceScheduler {
     const timer = setTimeout(() => {
       this.#timers.delete(timer);
       if (this.#stopped) return;
-      this.#queue = this.#queue.then(() => runMaintenanceTask(task, this.#store, this.#now));
+      this.#queue = this.#queue.then(async () => {
+        const run = await runMaintenanceTask(task, this.#store, this.#now);
+        this.#onRun?.(run);
+      });
       void this.#queue.finally(() => {
         if (!this.#stopped) this.#schedule(task, task.intervalMs);
       });

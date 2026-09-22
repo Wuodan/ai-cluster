@@ -45,12 +45,22 @@ if (sourceNames.includes("openrouter")) {
     readInterval("AI_CLUSTER_CATALOG_INTERVAL_MS", 6 * 60 * 60_000),
   ));
 }
-const maintenance = new MaintenanceScheduler(maintenanceTasks, store);
+const maintenance = new MaintenanceScheduler(maintenanceTasks, store, Date.now, (run) => {
+  process.stdout.write(`${JSON.stringify({ event: "maintenance", ...run })}\n`);
+});
 const host = process.env.AI_CLUSTER_HOST ?? "127.0.0.1";
 const port = readPort(process.env.AI_CLUSTER_PORT ?? "8787");
 
 server.listen(port, host, () => {
   process.stdout.write(`${JSON.stringify({ event: "listening", host, port })}\n`);
+  process.stdout.write(`${JSON.stringify({
+    event: "maintenance_configured",
+    tasks: maintenanceTasks.map((task) => ({
+      kind: task.kind,
+      target: task.target,
+      intervalMs: task.intervalMs,
+    })),
+  })}\n`);
   void maintenance.start(process.env.AI_CLUSTER_MAINTENANCE_RUN_ON_START !== "false");
 });
 

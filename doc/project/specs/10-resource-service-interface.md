@@ -8,6 +8,9 @@ host while the service itself listens inside its private container network. Both
 checks and an `unless-stopped` restart policy; the service gets a 45-second shutdown grace period so a bounded provider
 call can finish and SQLite can close cleanly.
 
+Development Compose binds the ignored repository-local `data/` directory at `/data`, making SQLite observations directly
+inspectable. `compose.production.yaml` replaces that bind mount with a named volume for production-style deployment.
+
 ## Endpoints
 
 - `POST /v1/inference` accepts `prompt`, optional `maxOutputTokens`, and optional requirements containing
@@ -45,6 +48,10 @@ Intervals can be changed with `AI_CLUSTER_PROBE_INTERVAL_MS`, `AI_CLUSTER_CATALO
 summary, and start/finish time. Provider HTTP calls are bounded to 30 seconds. All inference maintenance paths apply the
 same zero-cost allowlist as client requests. On restart, persisted last-run times determine the remaining delay; recent
 work is not repeated merely because the process restarted.
+
+Each completed or skipped maintenance run is also written as a structured `event: "maintenance"` line to standard
+output. An initial `maintenance_configured` line shows the active intervals, so quiet logs mean that no task is due—not
+that the scheduler is missing.
 
 The live Compose service is now running against its persistent volume. Its first cycles recorded three resources, a
 successful free-catalog snapshot, provider-resolved models, and a real OpenRouter transition from malformed response to
