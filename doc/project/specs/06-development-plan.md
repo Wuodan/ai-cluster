@@ -313,6 +313,11 @@ Researching or registering additional provider accounts should be reconsidered o
 the configured pool regularly prevents useful work through exhaustion, unavailability, or missing capabilities. It is
 not a current development step.
 
+The proposed boundary for the later coding work loop is recorded in
+[`12-coding-agent-boundary.md`](12-coding-agent-boundary.md). It places a deterministic project supervisor above an
+ACP-compatible coding agent and keeps provider selection and zero-cost enforcement below the agent in the resource
+service. Recording this design does not move its implementation into Milestone 6.
+
 ## Deferred until after the early resource loop
 
 - A general autonomous coding-agent integration.

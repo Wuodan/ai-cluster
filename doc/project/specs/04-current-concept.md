@@ -81,6 +81,11 @@ The work loop decides how available intelligence should be spent. It may eventua
 
 The work loop depends on the resource loop. Consequently, resource setup and management come first in development.
 
+The current proposed boundary uses a deterministic project-owned supervisor as the durable central process, an existing
+coding agent behind ACP for the inner software-development loop, and the resource service as the coding agent's only
+inference path. The proposal and its unresolved questions are recorded in
+[`12-coding-agent-boundary.md`](12-coding-agent-boundary.md); it is not yet implemented behavior.
+
 ## Persistent learning
 
 Learning must produce durable, inspectable results rather than exist only in an LLM context or process memory. Possible
