@@ -318,6 +318,28 @@ The proposed boundary for the later coding work loop is recorded in
 ACP-compatible coding agent and keeps provider selection and zero-cost enforcement below the agent in the resource
 service. Recording this design does not move its implementation into Milestone 6.
 
+### Next implementation sequence
+
+The agreed sequence from the current state is:
+
+1. Integrate the already verified Gemini project as the third external source, with the same fixed-resource allowlist,
+   persisted evidence, and zero-spend enforcement used by the existing sources.
+2. Complete Milestone 6 after the sustained soak has crossed a normal daily maintenance cycle, the local HTTP interface
+   has been verified from the host, and its persisted history still explains maintenance, failures, and recovery. The
+   soak should continue while other work proceeds; elapsed-time evidence must not be simulated.
+3. Qualify and activate selected named free models available through the existing OpenRouter account instead of relying
+   only on its rotating free route. This is model selection within a supplied account, not provider or account research.
+4. Add only the context-size, tool-use, and coding evaluations needed to choose resources for real coding work, retaining
+   the provider-resolved model and deterministic task outcomes.
+5. Run a narrow OpenCode/ACP experiment through the local resource gateway in a disposable repository before building a
+   broad work-loop implementation.
+6. Grow the deterministic supervisor from observed needs: durable task state, pause and resume, recovery, permissions,
+   validation, and bounded escalation.
+
+The coding-agent experiment should follow reasonably soon after Gemini integration and basic named-model selection.
+Further resource-service abstraction work should be justified by real consumer behavior rather than delaying the first
+coding workload until the resource layer appears theoretically complete.
+
 ## Deferred until after the early resource loop
 
 - A general autonomous coding-agent integration.
