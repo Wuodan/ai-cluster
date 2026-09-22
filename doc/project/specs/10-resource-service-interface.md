@@ -18,7 +18,7 @@ inspectable. `compose.production.yaml` replaces that bind mount with a named vol
   provider-resolved model when supplied, access path, output, current resource state, and current observed capability
   evidence.
 - `GET /v1/status` returns every configured resource, including an explicit unknown state before its first observation.
-- `GET /v1/history?limit=100` returns bounded recent attempts plus state transitions and local recovery findings.
+- `GET /v1/history?limit=100` returns bounded recent attempts, state transitions, and maintenance runs.
 - `GET /v1/audit` checks every persisted attempt against the zero-cost allowlist and reports cost-guard rejections.
 - `GET /health` reports process health.
 

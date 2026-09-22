@@ -1,24 +1,25 @@
-# Local recovery observations
+# Historical local recovery experiment
 
-Observed on 2026-09-21. This note records the Milestone 5 experiment; model availability and runtime behavior can change.
+Observed on 2026-09-21. This note preserves an experiment that informed local-model selection. The candidate-provider
+recovery command and persistence/API surface were removed after scope review: automated acquisition of additional
+provider accounts is not current project work. Model availability and runtime behavior can change.
 
-## Recovery contract
+## Experimental recovery contract
 
-The local model is not a general replacement for the external pool. It receives bounded, sanitized observations and has
-three jobs:
+The experiment treated the local model as a bounded interpreter rather than a general replacement for the external pool.
+It received sanitized observations and had three jobs:
 
 1. Distinguish a temporary wait from a genuinely new access path.
 2. Extract candidate provider, access path, supporting evidence, and concrete qualification checks.
 3. Stop at a clearly named manual obstacle when progress needs an account, credentials, terms acceptance, or payment
    configuration.
 
-It returns one strict JSON object. The deterministic layer validates the shape and persists the observations, raw output,
-parsed proposal, model identity, parse result, and time. The result never qualifies a source or authorizes spending. It
-contains no credential and cannot create an account or call a candidate endpoint.
+It returned one strict JSON object. The deterministic layer validated the shape and persisted the observations, raw
+output, parsed proposal, model identity, parse result, and time. The result never qualified a source or authorized
+spending. It contained no credential and could not create an account or call a candidate endpoint.
 
-The current inspection boundary is intentionally narrow: the recovery command reads at most 4096 bytes of already
-captured text on standard input. That text can come from the resource state/catalog code or from an explicitly allowed
-page captured by a deterministic caller. Automatic open-web research and page fetching are not yet granted to the model.
+The inspection boundary was intentionally narrow: the recovery command read at most 4096 bytes of already captured text
+on standard input. Automatic open-web research and page fetching were not granted to the model.
 
 ## Runtime selection
 
@@ -56,26 +57,8 @@ The existing general capability suite is not the acceptance test for this fallba
 short output budget before producing their final response. Recovery uses a bounded 768-token output budget within the
 2048-token runtime context and is accepted only when its complete output passes the strict proposal parser.
 
-## Reproduction
+## Resulting boundary
 
-Start the isolated local server (the first run downloads the 2.5 GB model):
-
-```sh
-docker compose up -d local-llama
-```
-
-After its health endpoint is ready, pipe observations to the one-shot recovery command:
-
-```sh
-printf '%s\n' 'All external sources are unavailable. No alternative path was found.' \
-  | docker compose --profile tools run --rm -T resource-manager
-```
-
-During development, the SQLite database is retained in the ignored repository-local `data/` directory so it can be
-inspected directly. The model cache is retained separately in the `model-cache` Docker volume.
-
-## Remaining boundary
-
-This milestone proves useful local interpretation and durable recovery output, not autonomous provider acquisition. A
-later step still needs a safe deterministic collector for allowlisted pages, plus candidate-specific qualification code.
-Unknown cost behavior, account setup, paid fallback, or terms acceptance must remain explicit manual obstacles.
+The experiment demonstrated that the 4B model can interpret bounded observations, but that behavior is not needed for
+the current product direction. The local runtime remains as an independently available inference source. Historical
+rows in the ignored development database are retained, but the application no longer reads or creates recovery findings.

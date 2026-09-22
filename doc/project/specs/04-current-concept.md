@@ -31,9 +31,10 @@ agents may all be potential resources.
 A one-time owner-funded account deposit that remains unspent may also be acceptable as setup infrastructure. It does not
 turn paid inference into an allowed resource: the system must be technically prevented from consuming the deposit.
 
-Repeated sign-up schemes intended to multiply a provider's allowance are out of scope for now. Autonomous registration
-of legitimate new accounts may be useful if it becomes technically feasible. The precise policy concerning provider
-terms has not yet been decided, but the project is not intended to rely on hacking providers or criminal activity.
+Repeated sign-up schemes intended to multiply a provider's allowance are out of scope. Accounts and credentials are
+supplied by the owner. Autonomous discovery and registration of additional provider accounts is not part of the current
+development direction; it may be reconsidered only in the far future if sustained operation proves that the configured
+resource pool is insufficient.
 
 ## Heterogeneous resources
 
@@ -55,14 +56,14 @@ on a single provider, model, interface, or coding agent.
 
 The resource loop keeps usable intelligence available. It shall eventually be capable of:
 
-1. discovering or being given potential free resources;
+1. accepting configured free resources and discovering models available through those configured accounts;
 2. determining how they can be accessed;
 3. testing their current availability and capabilities;
 4. observing quality, failures, exhaustion, and recovery;
 5. selecting suitable resources for particular kinds of decisions or work;
 6. switching when a resource becomes unsuitable or unavailable;
 7. retrying resources that may have recovered;
-8. finding replacements when the known pool is no longer sufficient.
+8. reporting when the known pool is no longer sufficient.
 
 Not all of this must be present in the first implementation. In particular, the mechanisms for inferring limits,
 cooldowns, and recovery are deliberately undecided.
@@ -74,7 +75,6 @@ The work loop decides how available intelligence should be spent. It may eventua
 - accept tasks from the owner;
 - choose useful work without waiting for a task;
 - plan and delegate software-development work;
-- research and qualify additional resources;
 - evaluate earlier work and routing decisions;
 - identify weaknesses in `ai-cluster`;
 - develop and test improvements to itself;
@@ -99,16 +99,14 @@ results include:
 The exact storage model is an implementation decision. Operational knowledge should be able to evolve without requiring
 a source-code change for every new observation.
 
-## Local fallback and recovery
+## Local fallback
 
 A small local LLM shall provide a fallback that is independent of external free offers. Approximately 1--4 GB of RAM
 should be sufficient. It need not run continuously, and it need not be a strong coding model.
 
-Its essential purpose is bootstrapping and recovery: when external resources are unusable, it should help the
-deterministic software research, find, access, or qualify at least one stronger free resource. Once stronger intelligence
-is recovered, that resource can take over harder research, evaluation, and engineering work.
-
-The division of responsibility between deterministic recovery code and the local model remains open.
+Its current purpose is to provide independently available, modest inference when external resources are unusable. It may
+support low-complexity diagnosis or other bounded work, but it is not responsible for discovering or acquiring provider
+accounts.
 
 ## Trusted system and autonomous laboratory
 
@@ -134,9 +132,8 @@ to the canonical repository.
 
 The early system may:
 
-- browse the internet and call free services;
-- use designated accounts and email;
-- register legitimate free accounts where possible;
+- browse the internet and call explicitly configured free services;
+- use designated accounts;
 - persist observations and experimental results;
 - write to its own fork and propose pull requests to `ai-cluster`;
 - run arbitrary experiments inside its assigned containment.

@@ -1,8 +1,4 @@
 services:
-  resource-manager:
-    volumes:
-      - resource-data:/data
-
   resource-service:
     volumes:
       - resource-data:/data

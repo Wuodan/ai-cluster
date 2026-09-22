@@ -4,8 +4,8 @@ This run keeps the early resource service available while later development cont
 catalog changes, intermittent provider failures, cooldown/recovery behavior, restart problems, and policy violations.
 It does not deliberately exhaust a free allowance.
 
-The soak is useful evidence for Milestone 6, but it is not a gate that prevents work on the resource-research worker or
-the later coding loop. Those can consume the service while the soak continues.
+The soak is useful evidence for Milestone 6, but it is not a gate that prevents later core development from consuming
+the service while the soak continues.
 
 ## Start or update
 
@@ -47,7 +47,7 @@ curl -sS http://127.0.0.1:8787/health
 curl -sS http://127.0.0.1:8787/v1/status | jq .
 ```
 
-Inspect recent inference attempts, state transitions, recovery findings, and maintenance heartbeats:
+Inspect recent inference attempts, state transitions, and maintenance heartbeats:
 
 ```sh
 curl -sS 'http://127.0.0.1:8787/v1/history?limit=100' | jq .

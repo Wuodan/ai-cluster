@@ -231,49 +231,38 @@ the actual resolved model is retained with every evaluation.
 No LLM evaluator is used yet. Coding quality and other non-deterministic capabilities remain unknown rather than being
 assigned unsupported confidence. A later evaluator may judge them only if its rationale and uncertainty are retained.
 
-## Milestone 5: local fallback and resource recovery
+## Milestone 5: local fallback runtime
 
 ### Hypothesis
 
-A model fitting approximately 1--4 GB of RAM can assist deterministic tools in restoring external capability when the
-known external pool is unusable.
+A model fitting approximately 1--4 GB of RAM can provide independently available inference when the external pool is
+unusable.
 
 ### Work
 
-- Turn the abstract recovery role into a small set of concrete tasks.
-- Evaluate local model and runtime candidates against those tasks.
-- Give the fallback narrowly scoped research and inspection tools.
+- Evaluate local model and runtime candidates within the memory target.
+- Expose the selected model through the same resource abstraction as external sources.
 - Simulate loss of every configured external source.
-- Have the recovery path produce durable candidate-source findings and qualification steps.
-- Where safe and feasible, use a recovered external model to continue deeper qualification.
+- Preserve explicit limitations in its observed capability evidence.
 
 ### Exit criteria
 
 - The fallback runs within the agreed local resource budget.
-- With external sources disabled, it produces a useful, persisted recovery result rather than merely an error message.
-- At least one controlled exercise progresses from no usable external source to a qualified external candidate, or
-  produces clear evidence of the remaining manual obstacle.
-
-Fully autonomous provider registration and adapter generation are not required for this milestone.
+- It remains callable when external sources are disabled.
+- Its observed capabilities and limitations are persisted rather than assumed.
 
 ### Current status
 
-The milestone is complete. Recovery is a narrow, non-authoritative operation: a local model interprets bounded sanitized
-observations and emits a strict proposal, while deterministic code validates and durably stores both the raw and parsed
-result. It cannot qualify a source, access credentials, register an account, or authorize spending.
+The milestone is complete. The selected fallback is Qwen3 4B Q4_K_M behind the CPU-only `llama.cpp` server. Its
+published model file is 2.5 GB and the live container used approximately 2.05 GiB resident memory after inference with a
+2048-token context. The smaller Qwen3 1.7B candidate was rejected after it mislabeled a pure quota-reset case as a new
+candidate.
 
-The selected fallback is Qwen3 4B Q4_K_M behind the CPU-only `llama.cpp` server. Its published model file is 2.5 GB and
-the live container used approximately 2.05 GiB resident memory after inference with a 2048-token context. The smaller
-Qwen3 1.7B candidate was rejected after it mislabeled a pure quota-reset case as a new candidate.
-
-In controlled exercises with all external sources unavailable, the selected model correctly distinguished a temporary
-429/reset condition, an unverified candidate that can be probed without human action, and a candidate blocked on account
-creation. All three results survived in SQLite with their original observations and outputs. Candidate claims remain
-untrusted and generate qualification steps; they do not enter the usable resource pool automatically.
-
-The current research boundary accepts text captured by deterministic inspection through standard input. Autonomous web
-fetching is deferred until an allowlisted, size-bounded, prompt-injection-aware collector exists. Detailed measurements,
-commands, limitations, and the controlled inputs are recorded in `09-local-recovery-observations.md`.
+The local source is part of the running service and has persisted capability evidence. An earlier experiment used it to
+produce candidate-provider recovery proposals. That feature was removed after scope review because acquiring additional
+provider accounts is not a current project responsibility. The experiment and model-selection measurements remain as
+historical evidence in `09-local-recovery-observations.md`; existing ignored SQLite rows are retained but no longer read
+by the application.
 
 ## Milestone 6: early resource service
 
@@ -325,39 +314,15 @@ not yet marked complete. Real quota exhaustion is no longer an exit requirement:
 to manufacture it would contradict the resource-conservation policy, and controlled exhaustion/recovery is already
 covered by Milestone 2.
 
-## Next step: bounded resource research and qualification
+## Direction after the early resource loop
 
-### Hypothesis
+Development should use and improve the resources already supplied by the owner before attempting to acquire more
+provider accounts. The next useful work is to integrate the already verified Gemini account, improve model selection and
+evaluation within the configured OpenRouter, Groq, and Gemini access paths, and use that capacity for core project work.
 
-An independent worker can use the resource service to turn a small, explicitly authorized documentation source into a
-durable candidate finding without trusting provider or model claims, spending money, or crossing a human decision
-boundary.
-
-### Initial work
-
-- Collect only exact allowlisted HTTPS pages with strict size, time, redirect, and content-type bounds.
-- Request structured analysis from the resource service by capability rather than by provider or model.
-- Persist the source snapshot, digest, selected and provider-resolved model, raw result, parsed claims, blockers, and
-  qualification state in a worker-owned database.
-- Keep every discovered candidate untrusted until deterministic qualification succeeds.
-- Restrict qualification to reviewed candidate-specific adapters; do not expose a generic endpoint or model probe.
-- Stop before account creation, credential acquisition, terms acceptance, or payment configuration.
-
-### Current status
-
-The first implementation slice is complete in code. The one-shot Compose worker has no provider credentials and consumes
-the local resource service over its private container network. Strict parsers and focused tests cover collection
-bounds, untrusted persistence, resource-service refusal, human blockers, absence of a trusted adapter, complete passing
-evidence, and adapter failure. No real candidate qualification adapter is registered yet, so provider research cannot
-silently promote a candidate into the usable pool. The design and operating contract are recorded in
-`12-resource-research-worker.md`.
-
-The worker has also completed a live containerized research run against an exact allowlisted Cloudflare Workers AI
-pricing document. It persisted one untrusted candidate and stopped at account, credential, and terms decisions. No
-candidate endpoint or paid path was called. Earlier rejected and accepted outputs demonstrated that prompt prohibitions
-were insufficient to make model-authored qualification instructions safe, so the model schema now excludes those
-instructions and the worker attaches a deterministic checklist. The resource-service audit remained clean and the soak
-continued without restart.
+Researching or registering additional provider accounts should be reconsidered only if durable observations show that
+the configured pool regularly prevents useful work through exhaustion, unavailability, or missing capabilities. It is
+not a current development step.
 
 ## Deferred until after the early resource loop
 
@@ -366,7 +331,7 @@ continued without restart.
 - Human inboxes, review batching, and bounded speculative work.
 - The trusted-supervisor/autonomous-laboratory implementation.
 - Self-development and pull requests to the canonical repository.
-- Autonomous account creation.
+- Autonomous discovery, registration, and qualification of additional provider accounts.
 - Contributions to external projects.
 - Broad concurrency and distributed execution.
 

@@ -78,7 +78,6 @@ export class ResourceService {
         state.resourceKey,
         await this.#store.listStateTransitions(state.resourceKey),
       ]))),
-      recoveryFindings: await this.#store.listRecoveryFindings(),
       maintenanceRuns: await this.#store.listRecentMaintenanceRuns(limit),
     };
   }
