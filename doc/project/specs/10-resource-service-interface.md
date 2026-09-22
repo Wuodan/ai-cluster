@@ -4,7 +4,9 @@ This is the first reviewable slice of Milestone 6. It exposes the resource loop 
 the client to know provider-specific APIs or model identifiers.
 
 The service listens on `127.0.0.1:8787` by default. The Compose deployment binds the same loopback-only address on the
-host while the service itself listens inside its private container network.
+host while the service itself listens inside its private container network. Both long-running containers have health
+checks and an `unless-stopped` restart policy; the service gets a 45-second shutdown grace period so a bounded provider
+call can finish and SQLite can close cleanly.
 
 ## Endpoints
 

@@ -1,6 +1,7 @@
 services:
   local-llama:
     image: ghcr.io/ggml-org/llama.cpp:server
+    restart: unless-stopped
     command:
       - -hf
       - ggml-org/Qwen3-4B-GGUF:Q4_K_M
@@ -37,12 +38,20 @@ services:
   resource-service:
     build: .
     command: ["node", "dist/src/server.js"]
+    restart: unless-stopped
+    stop_grace_period: 45s
     environment:
       AI_CLUSTER_HOST: 0.0.0.0
       AI_CLUSTER_LOCAL_ENDPOINT: http://local-llama:8080/v1/chat/completions
       AI_CLUSTER_SOURCES: openrouter,groq,local
     ports:
       - "127.0.0.1:8787:8787"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     volumes:
       - resource-data:/data
       - ./secrets/openrouter_api_key:/run/secrets/openrouter_api_key:ro
