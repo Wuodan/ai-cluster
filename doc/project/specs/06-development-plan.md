@@ -310,7 +310,8 @@ zero-spend audit whose provider-balance limitation is stated rather than hidden.
 
 Background catalog refresh, capability evaluation, and availability probing run through one non-overlapping queue with
 configurable lower-bounded intervals. Available resources are not probed merely to consume capacity. Disabled and
-still-cooling resources are skipped, calls have time bounds, and each maintenance run is durable.
+still-cooling resources are skipped, calls have time bounds, and each maintenance run is durable. Restarts use those
+durable run times rather than repeating maintenance that is not yet due.
 
 The live Compose service has survived one intentional container restart with its SQLite history intact. During its first
 cycles, OpenRouter returned a malformed empty result through one routed free model, entered degraded cooldown, and later

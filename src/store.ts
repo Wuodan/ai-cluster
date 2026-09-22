@@ -496,6 +496,27 @@ export class ResourceStore {
     }));
   }
 
+  async getLatestMaintenanceRun(
+    kind: MaintenanceRunRecord["kind"],
+    target: string,
+  ): Promise<StoredMaintenanceRun | undefined> {
+    const row = this.#database.prepare(`
+      SELECT * FROM maintenance_runs
+      WHERE kind = ? AND target = ?
+      ORDER BY started_at_ms DESC, id DESC LIMIT 1
+    `).get(kind, target) as Record<string, unknown> | undefined;
+    if (row === undefined) return undefined;
+    return {
+      id: row.id as string,
+      kind: row.kind as MaintenanceRunRecord["kind"],
+      target: row.target as string,
+      outcome: row.outcome as MaintenanceRunRecord["outcome"],
+      summary: row.summary as string,
+      startedAtMs: row.started_at_ms as number,
+      finishedAtMs: row.finished_at_ms as number,
+    };
+  }
+
   #migrate(): void {
     this.#database.exec(`
       CREATE TABLE IF NOT EXISTS schema_migrations (

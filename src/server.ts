@@ -51,7 +51,7 @@ const port = readPort(process.env.AI_CLUSTER_PORT ?? "8787");
 
 server.listen(port, host, () => {
   process.stdout.write(`${JSON.stringify({ event: "listening", host, port })}\n`);
-  maintenance.start(process.env.AI_CLUSTER_MAINTENANCE_RUN_ON_START !== "false");
+  void maintenance.start(process.env.AI_CLUSTER_MAINTENANCE_RUN_ON_START !== "false");
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

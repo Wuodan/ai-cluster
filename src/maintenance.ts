@@ -43,10 +43,11 @@ export class MaintenanceScheduler {
   readonly #store: ResourceStore;
   readonly #tasks: readonly MaintenanceTask[];
   readonly #timers = new Set<NodeJS.Timeout>();
+  readonly #now: () => number;
   #queue: Promise<void> = Promise.resolve();
   #stopped = true;
 
-  constructor(tasks: readonly MaintenanceTask[], store: ResourceStore) {
+  constructor(tasks: readonly MaintenanceTask[], store: ResourceStore, now: () => number = Date.now) {
     for (const task of tasks) {
       if (!Number.isSafeInteger(task.intervalMs) || task.intervalMs < 1_000) {
         throw new Error(`Invalid maintenance interval for ${task.kind}`);
@@ -54,12 +55,19 @@ export class MaintenanceScheduler {
     }
     this.#tasks = tasks;
     this.#store = store;
+    this.#now = now;
   }
 
-  start(runImmediately = true): void {
+  async start(runWhenNeverObserved = true): Promise<void> {
     if (!this.#stopped) return;
     this.#stopped = false;
-    for (const task of this.#tasks) this.#schedule(task, runImmediately ? 0 : task.intervalMs);
+    for (const task of this.#tasks) {
+      const latest = await this.#store.getLatestMaintenanceRun(task.kind, task.target);
+      const delayMs = latest === undefined
+        ? (runWhenNeverObserved ? 0 : task.intervalMs)
+        : Math.max(0, latest.startedAtMs + task.intervalMs - this.#now());
+      this.#schedule(task, delayMs);
+    }
   }
 
   async stop(): Promise<void> {
@@ -73,7 +81,7 @@ export class MaintenanceScheduler {
     const timer = setTimeout(() => {
       this.#timers.delete(timer);
       if (this.#stopped) return;
-      this.#queue = this.#queue.then(() => runMaintenanceTask(task, this.#store));
+      this.#queue = this.#queue.then(() => runMaintenanceTask(task, this.#store, this.#now));
       void this.#queue.finally(() => {
         if (!this.#stopped) this.#schedule(task, task.intervalMs);
       });

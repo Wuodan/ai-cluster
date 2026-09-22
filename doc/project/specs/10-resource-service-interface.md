@@ -39,7 +39,8 @@ Background maintenance uses a single queue, so maintenance calls never overlap. 
 Intervals can be changed with `AI_CLUSTER_PROBE_INTERVAL_MS`, `AI_CLUSTER_CATALOG_INTERVAL_MS`, and
 `AI_CLUSTER_EVALUATION_INTERVAL_MS`; values below one second are rejected. Every run records kind, target, outcome,
 summary, and start/finish time. Provider HTTP calls are bounded to 30 seconds. All inference maintenance paths apply the
-same zero-cost allowlist as client requests.
+same zero-cost allowlist as client requests. On restart, persisted last-run times determine the remaining delay; recent
+work is not repeated merely because the process restarted.
 
 The live Compose service is now running against its persistent volume. Its first cycles recorded three resources, a
 successful free-catalog snapshot, provider-resolved models, and a real OpenRouter transition from malformed response to

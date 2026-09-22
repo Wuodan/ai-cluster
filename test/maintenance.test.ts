@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   createAvailabilityProbeTask,
   createCapabilityEvaluationTask,
+  MaintenanceScheduler,
   runMaintenanceTask,
   type MaintenanceTask,
 } from "../src/maintenance.js";
@@ -39,6 +40,36 @@ test("maintenance records success and failure without throwing", async () => {
     ["capability_evaluation", "failed", "provider offline"],
     ["catalog_refresh", "success", "observed_2_free_models"],
   ]);
+  store.close();
+});
+
+test("scheduler does not repeat recent persisted work after restart", async () => {
+  const store = new ResourceStore(":memory:");
+  let calls = 0;
+  const task: MaintenanceTask = {
+    kind: "catalog_refresh",
+    target: "provider",
+    intervalMs: 1_000,
+    async execute() {
+      calls += 1;
+      return { outcome: "success", summary: "unexpected" };
+    },
+  };
+  await store.recordMaintenanceRun({
+    kind: task.kind,
+    target: task.target,
+    outcome: "success",
+    summary: "recent",
+    startedAtMs: 1_000,
+    finishedAtMs: 1_100,
+  });
+  const scheduler = new MaintenanceScheduler([task], store, () => 1_500);
+
+  await scheduler.start();
+  await scheduler.stop();
+
+  assert.equal(calls, 0);
+  assert.equal((await store.listRecentMaintenanceRuns(10)).length, 1);
   store.close();
 });
 
