@@ -79,4 +79,22 @@ export interface NoSuitableSource {
   readonly minimumContextTokens?: number;
 }
 
-export type InferenceRunResult = SuccessfulInference | NoSourceSucceeded | NoSuitableSource;
+export interface CurrentlyUnavailableResource {
+  readonly sourceId: string;
+  readonly model: string;
+  readonly state: "disabled" | "cooling_down" | "degraded" | "exhausted";
+  readonly retryAtMs?: number;
+  readonly reason: string;
+}
+
+export interface NoResourceCurrentlyAvailable {
+  readonly status: "no_resource_currently_available";
+  readonly requestId: string;
+  readonly resources: readonly CurrentlyUnavailableResource[];
+}
+
+export type InferenceRunResult =
+  | SuccessfulInference
+  | NoSourceSucceeded
+  | NoSuitableSource
+  | NoResourceCurrentlyAvailable;

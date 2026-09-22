@@ -6,6 +6,7 @@ import type {
   InferenceRunResult,
   InferenceSource,
   SourceResult,
+  CurrentlyUnavailableResource,
 } from "./resource.js";
 import { decideResourceState } from "./resource-state.js";
 import type { ResourceStore } from "./store.js";
@@ -36,6 +37,7 @@ export class ResourceLoop {
   async run(request: InferenceRequest): Promise<InferenceRunResult> {
     const requestId = randomUUID();
     const outcomes: AttemptOutcome[] = [];
+    const unavailableResources: CurrentlyUnavailableResource[] = [];
     let suitableResourceCount = 0;
 
     for (const [index, source] of this.#sources.entries()) {
@@ -44,8 +46,25 @@ export class ResourceLoop {
       suitableResourceCount += 1;
       let previousState = await this.#store.getResourceState(key);
       const selectionTimeMs = this.#now();
-      if (previousState?.state === "disabled") continue;
-      if (previousState?.retryAtMs !== undefined && previousState.retryAtMs > selectionTimeMs) continue;
+      if (previousState?.state === "disabled") {
+        unavailableResources.push({
+          sourceId: source.id,
+          model: source.model,
+          state: "disabled",
+          reason: previousState.reason,
+        });
+        continue;
+      }
+      if (previousState?.retryAtMs !== undefined && previousState.retryAtMs > selectionTimeMs) {
+        unavailableResources.push({
+          sourceId: source.id,
+          model: source.model,
+          state: unavailableState(previousState.state),
+          retryAtMs: previousState.retryAtMs,
+          reason: previousState.reason,
+        });
+        continue;
+      }
       if (previousState !== undefined && previousState.state !== "available" && previousState.state !== "unknown") {
         await this.#store.setResourceState({
           ...previousState,
@@ -121,10 +140,24 @@ export class ResourceLoop {
           : { minimumContextTokens: request.requirements.minimumContextTokens }),
       };
     }
+    if (outcomes.length === 0 && unavailableResources.length > 0) {
+      return {
+        status: "no_resource_currently_available",
+        requestId,
+        resources: unavailableResources,
+      };
+    }
     return { status: "no_source_succeeded", requestId, outcomes };
   }
 }
 
 export function resourceKey(source: Pick<InferenceSource, "id" | "model">): string {
   return `${source.id}:${source.model}`;
+}
+
+function unavailableState(state: string): CurrentlyUnavailableResource["state"] {
+  if (state === "disabled" || state === "degraded" || state === "exhausted" || state === "cooling_down") {
+    return state;
+  }
+  return "cooling_down";
 }

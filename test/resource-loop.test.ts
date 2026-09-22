@@ -246,10 +246,17 @@ test("retains cooldown across a process restart", async () => {
     const result = await secondLoop.run({ prompt: "work again", maxOutputTokens: 32 });
 
     assert.equal(shouldBeSkipped.calls, 0);
-    assert.deepEqual(
-      { ...result, requestId: undefined },
-      { status: "no_source_succeeded", requestId: undefined, outcomes: [] },
-    );
+    assert.deepEqual({ ...result, requestId: undefined }, {
+      status: "no_resource_currently_available",
+      requestId: undefined,
+      resources: [{
+        sourceId: "source",
+        model: "free-model",
+        state: "exhausted",
+        retryAtMs: nowMs + 60_000,
+        reason: "resource_exhausted",
+      }],
+    });
     assert.equal((await reopenedStore.getResourceState(resourceKey(shouldBeSkipped)))?.state, "exhausted");
     reopenedStore.close();
   } finally {

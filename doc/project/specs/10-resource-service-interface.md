@@ -19,7 +19,9 @@ host while the service itself listens inside its private container network.
 
 When no resource has the requested capability evidence, inference returns HTTP 503 with
 `status: "no_suitable_source"`. When suitable resources exist but all fail, it returns HTTP 503 with
-`status: "no_source_succeeded"`. Both results carry a request ID for history correlation.
+`status: "no_source_succeeded"`. When matching resources exist but are disabled or still cooling down, it returns
+`status: "no_resource_currently_available"` with the affected resources, reasons, and known retry times. All results
+carry a request ID for history correlation.
 
 The audit is deliberately labeled as an application-selection-policy audit. It can prove that this software did not
 select a resource outside its allowlist and that OpenRouter rejected any response lacking exact zero reported cost. It
