@@ -77,6 +77,39 @@ sqlite3 -header -column data/resource-loop.sqlite \
 
 Read it while the service is running if desired, but do not edit it behind the service's back.
 
+## Check Milestone 6 readiness without waiting in an interactive session
+
+After the service has remained running through the next normal daily capability-evaluation cycle, run this once from the
+repository root:
+
+```sh
+npm run soak:check
+```
+
+The checker is read-only. It does not call any model or consume provider allowance. It reads the local HTTP status and
+audit plus aggregate evidence from `data/resource-loop.sqlite`. It checks:
+
+- that the host can reach the loopback HTTP interface;
+- that exactly the expected OpenRouter, Groq, Gemini, and local resources are configured and allowlisted;
+- that all four resources are currently available and have capability evidence;
+- that the application-selection audit reports no paid path;
+- that persisted maintenance spans at least 24 hours and the latest run of each kind did not fail;
+- that a normal capability-evaluation run completed after Gemini was first observed;
+- that the state history contains a temporary failure followed by recovery.
+
+While a time or maintenance condition is still pending, the command prints `WAIT`, ends with `NOT READY`, and exits with
+status 1. Leave the soak running and repeat the command later; do not shorten the configured intervals merely to make it
+pass. When every condition passes, it ends with `READY FOR REVIEW` and exits with status 0. Send that summary with the
+next request to review and, if appropriate, close Milestone 6.
+
+To check a non-default database or service address:
+
+```sh
+AI_CLUSTER_DATABASE_PATH=/path/to/resource-loop.sqlite \
+AI_CLUSTER_BASE_URL=http://127.0.0.1:8787 \
+npm run soak:check
+```
+
 ## Restart and persistence check
 
 This exercises process restart without deleting data:

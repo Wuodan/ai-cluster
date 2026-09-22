@@ -10,6 +10,7 @@
     "build": "npm run clean && tsc -p tsconfig.json",
     "check": "npm run typecheck && npm test",
     "clean": "node --input-type=module --eval \"import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true })\"",
+    "soak:check": "node scripts/check-soak.mjs",
     "serve": "node dist/src/server.js",
     "start": "node dist/src/cli.js",
     "test": "npm run build && node --test 'dist/test/**/*.test.js'",
