@@ -1,0 +1,38 @@
+version: 2
+
+updates:
+  - package-ecosystem: "npm"
+    directories:
+      - "/"
+      - "/*"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 3
+    labels:
+      - "dependencies"
+    groups:
+      npm:
+        patterns:
+          - "*"
+    ignore:
+      # ignore to keep in sync with node24 used by GH runners
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
+      # ignore until ESLint supports TS 7
+      - dependency-name: "typescript"
+        versions: [">=7"]
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 3
+    labels:
+      - "dependencies"
+    groups:
+      docker:
+        patterns:
+          - "*"
