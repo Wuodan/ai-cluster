@@ -1,0 +1,28 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "forkProcessing": "enabled",
+  "separateMajorMinor": false,
+  "enabledManagers": ["docker-compose", "dockerfile", "npm"],
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "matchManagers": ["npm"],
+      "groupName": "npm",
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "matchManagers": ["docker-compose", "dockerfile"],
+      "groupName": "docker",
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "matchPackageNames": ["@types/node"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<7"
+    }
+  ]
+}
