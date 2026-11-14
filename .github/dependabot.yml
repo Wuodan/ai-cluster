@@ -25,7 +25,8 @@ updates:
         versions: [">=7"]
 
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "**/*"
     schedule:
       interval: "weekly"
     cooldown:
